@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+# 캐릭터 그림은 별도 라이선스(AGPL-3.0) → scripts/fetch-clawd.sh 로 각자 가져온다
+agent-lab/clawd/*.svg
+# 생성물·개인 설정
+project-graph/config.json
+project-graph/PROJECT_GRAPH.html
+project-graph/PROJECT_MAP.md
+.lab/live/
+*.vsix
+*.bak_*

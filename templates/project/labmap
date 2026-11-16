@@ -1,0 +1,9 @@
+#!/bin/zsh
+# 에이전트 연구실 화면(실시간)을 켜고 끈다. 실제 일은 공용 도구 agent-lab 이 한다.
+# 이 프로젝트의 지도는 .lab/map.json, 기록은 .lab/live/events.jsonl 이다.
+#   ./labmap          서버를 켜고 브라우저로 연다
+#   ./labmap up       서버만 켠다
+#   ./labmap stop     서버를 끈다
+#   ./labmap status   켜져 있는지 본다
+# AGENT_LAB_HOME: agent-lab 폴더 위치 (기본 ~/agents/agent-lab)
+exec "${AGENT_LAB_HOME:-$HOME/agents/agent-lab}/labctl" "${0:A:h}" "$@"

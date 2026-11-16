@@ -1,0 +1,44 @@
+{
+  "name": "project-map-reveal",
+  "displayName": "Project Map Reveal",
+  "description": "PROJECT_MAP 마인드맵과 프로젝트 관계 그래프: 작업영역을 열면 갱신해 띄우고, 링크로 탐색기에서 폴더를 보여준다",
+  "version": "0.0.5",
+  "publisher": "kjyil",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onUri",
+    "onStartupFinished"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "projectMap.openGraph",
+        "title": "프로젝트 관계 그래프 열기",
+        "category": "Project Map"
+      },
+      {
+        "command": "projectMap.refreshGraph",
+        "title": "프로젝트 관계 그래프 다시 분석해서 열기",
+        "category": "Project Map"
+      },
+      {
+        "command": "projectMap.openMap",
+        "title": "폴더 구조 맵 열기",
+        "category": "Project Map"
+      },
+      {
+        "command": "projectMap.openLabMap",
+        "title": "에이전트 연구실 열기 (Clawd 실시간)",
+        "category": "Project Map"
+      },
+      {
+        "command": "projectMap.openAgentFlow",
+        "title": "에이전트 보기 (연구실, 없으면 Agent Flow)",
+        "category": "Project Map"
+      }
+    ]
+  }
+}

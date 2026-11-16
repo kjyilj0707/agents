@@ -1,0 +1,42 @@
+{
+  "_설명": "예시 지도. 웹 서비스 팀(총괄 + 백엔드 + 프론트 + QA + 점검)을 가정했다. paths는 프로젝트 기준 경로의 앞부분이다.",
+  "project": "예시 팀",
+  "main_agent": "team-chief",
+  "port": 8780,
+  "agents": [
+    {"id": "team-chief", "name": "총괄", "role": "상황 파악 · 일 나누기 · 결과 종합", "color": "#b18cf2"},
+    {"id": "team-backend", "name": "백엔드", "role": "서버 코드 · 상태 흐름 · 권한", "color": "#2dd4bf"},
+    {"id": "team-frontend", "name": "프론트", "role": "화면 · 반응형 · 접근성", "color": "#f472b6"},
+    {"id": "team-qa", "name": "QA", "role": "테스트 · CI", "color": "#4ade80"},
+    {"id": "team-audit", "name": "점검", "role": "보호 경로 독립 검토 (읽기만)", "color": "#f87171", "readonly": true}
+  ],
+  "stages": [
+    {"id": "s_docs", "title": "① 요구·설계", "owner": "team-chief", "nodes": [
+      {"id": "secret_docs", "label": "내부 자료", "sensitive": true, "paths": ["private/"]},
+      {"id": "design", "label": "설계 문서", "paths": ["docs/"]},
+      {"id": "ext_web", "label": "웹 자료", "external": "web"}
+    ]},
+    {"id": "s_logic", "title": "② 핵심 규칙", "owner": "team-backend", "nodes": [
+      {"id": "state", "label": "상태 흐름", "protected": true, "paths": ["src/lib/state"]},
+      {"id": "api", "label": "서버 API", "paths": ["src/app/api/", "src/server/"]}
+    ]},
+    {"id": "s_ui", "title": "③ 화면", "owner": "team-frontend", "nodes": [
+      {"id": "pages", "label": "페이지", "paths": ["src/app/"]},
+      {"id": "components", "label": "부품", "paths": ["src/components/"]}
+    ]},
+    {"id": "s_test", "title": "④ 검사", "owner": "team-qa", "nodes": [
+      {"id": "tests", "label": "테스트", "paths": ["tests/", "src/lib/state.test"]},
+      {"id": "ci", "label": "CI", "paths": [".github/"]}
+    ]},
+    {"id": "s_share", "title": "⑤ 공유", "owner": "team-chief", "nodes": [
+      {"id": "ext_github", "label": "GitHub", "external": "github"},
+      {"id": "ext_notion", "label": "노션", "external": "notion"},
+      {"id": "rules", "label": "팀 규칙", "paths": ["CLAUDE.md", ".claude/"]}
+    ]}
+  ],
+  "externals": {"web": "ext_web", "github": "ext_github", "notion": "ext_notion"},
+  "flows": [
+    ["design", "state"], ["design", "pages"], ["state", "api"], ["api", "pages"],
+    ["components", "pages"], ["state", "tests"], ["pages", "tests"], ["tests", "ci"], ["ci", "ext_github"]
+  ]
+}

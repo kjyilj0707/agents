@@ -1,0 +1,13 @@
+{
+  "_설명": "프로젝트의 .claude/settings.json 의 hooks 에 아래 항목을 추가한다(기존 훅은 지우지 않는다). AGENT_LAB_HOME 이 다르면 경로를 바꾼다.",
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "UserPromptSubmit": [{"hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "PreToolUse": [{"matcher": "", "hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "PostToolUse": [{"matcher": "", "hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "PostToolUseFailure": [{"matcher": "", "hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "SubagentStart": [{"matcher": "", "hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "SubagentStop": [{"matcher": "", "hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "python3 -I \"$HOME/agents/agent-lab/hook.py\"", "timeout": 3}]}]
+  }
+}

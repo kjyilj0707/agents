@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>에이전트 연구실</title>
+<link rel="icon" href="clawd/clawd-happy.svg">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0b0f14; --panel:#121820; --panel2:#171f29; --ink:#e6edf3; --muted:#8b97a5; --faint:#5b6674;
+  --line:#243040; --line2:#2f3d50; --flow:#3a4859;
+  --read:#4da3ff; --write:#ff9f43; --run:#3fd17a; --warn:#ffcc4d; --danger:#ff6b6b; --live:#3fd17a;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",sans-serif}
+button,select{font:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:4px 10px;cursor:pointer;min-height:28px}
+button:hover,select:hover{border-color:var(--muted)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--read);outline-offset:1px}
+button.primary{background:color-mix(in srgb,var(--read) 22%,var(--panel2));border-color:color-mix(in srgb,var(--read) 55%,var(--line2))}
+
+/* 1. 상단 바 */
+header{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;padding:9px 16px;background:color-mix(in srgb,var(--panel) 94%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:8px;min-width:0}
+.brand .ls{position:relative;display:inline-block;width:30px;height:26px;overflow:hidden}
+.brand .ls img{position:absolute;left:50%;top:50%;width:52px;height:52px;transform:translate(-50%,-66%)}
+h1{font-size:15px;margin:0;font-weight:700;white-space:nowrap}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);font-size:12px;white-space:nowrap}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+#live.on{color:var(--live);border-color:color-mix(in srgb,var(--live) 45%,var(--line2))}
+#live.on i{background:var(--live);animation:pulse 1.6s infinite}
+#live.review{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,var(--line2))}
+#live.review i{background:var(--warn)}
+#live.off{color:var(--danger)} #live.off i{background:var(--danger)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--live) 60%,transparent)}100%{box-shadow:0 0 0 7px transparent}}
+.stat{color:var(--muted);white-space:nowrap} .stat b{color:var(--ink);font-size:14px;font-variant-numeric:tabular-nums}
+.spacer{flex:1}
+.ctl{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+#legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:6px 16px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11.5px;background:var(--bg)}
+#legend .k{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+#legend .sw{width:9px;height:9px;border-radius:50%}
+#legend .ls{position:relative;display:inline-block;width:24px;height:20px;overflow:hidden}
+#legend .ls img{position:absolute;left:50%;top:50%;width:36px;height:36px;transform:translate(-50%,-66%)}
+#legend .sep{width:1px;height:14px;background:var(--line2)}
+
+main{padding:12px 16px 20px;display:flex;flex-direction:column;gap:12px;max-width:1500px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px 12px;position:relative}
+.panel>h2{font-size:12.5px;margin:0 0 8px;font-weight:650;color:var(--muted);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.panel>h2 b{color:var(--ink);font-weight:700}
+
+/* 2. 에이전트 줄 */
+#team{padding-bottom:14px}
+#agentsBox{position:relative}
+#teamSvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:0}
+#chiefRow{display:flex;margin-bottom:44px}
+#workers{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
+.agent{position:relative;z-index:1;display:flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line2);border-left:4px solid var(--c);border-radius:10px;padding:6px 10px 6px 4px;min-width:0;transition:box-shadow .3s,border-color .3s}
+.agent.chief{width:min(360px,100%)}
+.agent.busy{box-shadow:0 0 0 1px var(--c),0 0 18px color-mix(in srgb,var(--c) 30%,transparent);border-color:var(--c)}
+.agent .spr{flex:none;width:58px;height:58px;position:relative;overflow:hidden}
+.agent.chief .spr{width:74px;height:74px}
+.agent .spr img{position:absolute;left:50%;top:50%;width:175%;height:175%;transform:translate(-50%,-66%);filter:var(--tint)}
+.agent .info{min-width:0;flex:1}
+.agent .top{display:flex;align-items:center;gap:6px}
+.agent .name{font-weight:750;font-size:14px;color:var(--c);white-space:nowrap}
+.agent .state{margin-left:auto;font-size:10.5px;padding:0 7px;border-radius:999px;border:1px solid var(--line2);color:var(--muted);white-space:nowrap}
+.agent.busy .state{background:var(--c);border-color:var(--c);color:#0b0f14;font-weight:650}
+.agent.err .state{background:var(--danger);border-color:var(--danger);color:#fff}
+.agent .role{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent .now{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;min-height:17px}
+.agent .meta{font-size:10.5px;color:var(--faint)}
+.branch{fill:none;stroke:var(--line2);stroke-width:1.5;stroke-dasharray:3 5}
+.branch.on{stroke:var(--c);stroke-width:2.4;stroke-dasharray:8 6;animation:dash 1s linear infinite;filter:drop-shadow(0 0 4px var(--c))}
+.branch.back{stroke:var(--c);stroke-width:2.4;stroke-dasharray:8 6;animation:dash 1s linear infinite reverse;opacity:.9}
+@keyframes dash{to{stroke-dashoffset:-28}}
+
+/* 3. 파이프라인 */
+#pipeWrap{overflow-x:auto;overflow-y:hidden;padding:4px 2px 8px;scrollbar-color:var(--line2) transparent}
+#pipeInner{position:relative;display:inline-flex;gap:26px;min-width:100%;align-items:flex-start}
+#flows{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.flow{fill:none;stroke:var(--flow);stroke-width:1.4}
+.flow.hot{stroke:var(--hc);stroke-width:2;filter:drop-shadow(0 0 3px var(--hc))}
+.stage{position:relative;z-index:1;flex:1 0 158px;max-width:220px;border-radius:10px;padding:8px;background:color-mix(in srgb,var(--c) 6%,var(--panel));border:1px solid color-mix(in srgb,var(--c) 30%,var(--line))}
+.stage h3{margin:0;font-size:12.5px;word-break:keep-all}
+.stage .owner{font-size:10.5px;color:var(--c);font-weight:650;margin:1px 0 8px}
+.node{position:relative;background:var(--panel2);border:1.5px solid var(--oc);border-radius:8px;padding:6px 8px 5px;margin-bottom:9px;font-size:12px;transition:box-shadow .35s,background .35s}
+.node:last-child{margin-bottom:0}
+.node .n{display:block;font-weight:650;word-break:keep-all;padding-right:14px}
+.node .ico{margin-right:3px}
+.node .who{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;min-height:0}
+.node .who span{width:17px;height:17px;border-radius:50%;background:var(--c);color:#0b0f14;font-size:9.5px;font-weight:800;display:grid;place-items:center}
+.node .last{display:block;color:var(--muted);font-size:10.5px;min-height:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node .cnt{position:absolute;top:-8px;right:-7px;font-size:10px;min-width:18px;text-align:center;padding:0 5px;border-radius:999px;background:var(--line2);color:var(--ink);display:none}
+.node.touched .cnt{display:block}
+.node .shared{display:none;position:absolute;top:-8px;left:8px;font-size:9.5px;font-weight:700;padding:0 6px;border-radius:999px;background:var(--warn);color:#0b0f14}
+.node.multi .shared{display:block}
+.node.hit{box-shadow:0 0 0 2px var(--hc),0 0 18px color-mix(in srgb,var(--hc) 55%,transparent);background:color-mix(in srgb,var(--hc) 14%,var(--panel2))}
+.node.ext{border-style:dashed;background:transparent}
+.node.sensitive{background:repeating-linear-gradient(135deg,var(--panel2) 0 7px,color-mix(in srgb,var(--danger) 7%,var(--panel2)) 7px 14px)}
+.node.protected .n::after{content:"보호";margin-left:5px;font-size:9.5px;font-weight:700;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 60%,transparent);border-radius:4px;padding:0 3px;vertical-align:1px}
+.node .pop{position:absolute;right:-16px;bottom:-22px;width:58px;height:58px;pointer-events:none;filter:var(--tint);animation:pop 1.8s ease forwards}
+@keyframes pop{0%{transform:scale(.2);opacity:0}15%{transform:scale(1.1);opacity:1}75%{opacity:1}100%{transform:scale(.8);opacity:0}}
+
+/* 효과 레이어 (날아가는 점) */
+#fx{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:30}
+
+/* 4. 타임라인 */
+#tlbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+#clock{font:600 15px var(--mono);font-variant-numeric:tabular-nums;margin-left:4px}
+#tlmode{font-size:11.5px;color:var(--muted)}
+#tlbar button{padding:2px 9px;min-height:26px}
+#tlLive.on{color:var(--live);border-color:color-mix(in srgb,var(--live) 50%,var(--line2))}
+#track{position:relative;height:34px;border-radius:7px;background:var(--panel2);border:1px solid var(--line2);cursor:pointer;overflow:hidden}
+#track canvas{position:absolute;inset:0;width:100%;height:100%}
+#head{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);box-shadow:0 0 6px var(--ink);left:100%;transform:translateX(-2px)}
+#hoverT{position:absolute;top:2px;font:10.5px var(--mono);color:var(--muted);pointer-events:none;display:none;background:var(--panel);padding:0 4px;border-radius:4px}
+.tlaxis{display:flex;justify-content:space-between;font:10.5px var(--mono);color:var(--faint);margin-top:3px}
+
+/* 5. 활동 기록 */
+#feed{list-style:none;margin:0;padding:0;max-height:320px;overflow:auto}
+#feed li{display:grid;grid-template-columns:58px 10px 1fr;gap:8px;padding:5px 2px;border-bottom:1px solid var(--line);align-items:baseline}
+#feed li:last-child{border-bottom:0}
+#feed time{color:var(--faint);font:11px var(--mono)}
+#feed .d{width:8px;height:8px;border-radius:50%;background:var(--c);align-self:center}
+#feed .txt b{color:var(--c)}
+#feed .sub{display:block;color:var(--muted);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#feed .tag{font-size:10px;padding:0 5px;border-radius:4px;margin-left:5px;border:1px solid currentColor;vertical-align:1px}
+#feed li.warn .txt{color:var(--warn)}
+#feed li.fail .txt{color:var(--danger)}
+#feed li.new{animation:flash 1.2s}
+@keyframes flash{from{background:color-mix(in srgb,var(--c) 18%,transparent)}to{background:transparent}}
+.empty{color:var(--muted);padding:10px 2px}
+@media (max-width:760px){
+  header{padding:8px 12px} main{padding:10px 10px 16px} #legend{padding:6px 12px}
+  #workers{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+  .agent .spr{width:48px;height:48px} .agent.chief .spr{width:60px;height:60px}
+  #chiefRow{margin-bottom:26px}
+}
+@media (prefers-reduced-motion:reduce){.branch.on,.branch.back,#live.on i{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="ls"><img src="clawd/clawd-idle-living.svg" alt=""></span><h1 id="pname">에이전트 연구실</h1></div>
+  <span id="live" class="pill"><i></i><span id="liveTxt">연결 중…</span></span>
+  <span class="stat"><b id="nWork">0</b> 일하는 중</span>
+  <span class="stat"><b id="nTools">0</b> 도구 호출</span>
+  <span class="spacer"></span>
+  <div class="ctl">
+    <select id="sess" aria-label="세션 선택"><option value="">세션 전체</option></select>
+    <button id="demo" class="primary">▶ 시연 재생</button>
+    <button id="clear">화면 비우기</button>
+  </div>
+</header>
+<div id="legend">
+  <span class="k"><i class="sw" style="background:var(--read)"></i>읽기</span>
+  <span class="k"><i class="sw" style="background:var(--write)"></i>쓰기</span>
+  <span class="k"><i class="sw" style="background:var(--run)"></i>실행</span>
+  <span class="k">━ 위임(→)·보고(←)</span>
+  <span class="sep"></span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-sleeping.svg" alt=""></span>쉼</span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-idle-reading.svg" alt=""></span>읽음</span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-working-typing.svg" alt=""></span>씀</span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-working-building.svg" alt=""></span>실행</span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-working-carrying.svg" alt=""></span>맡김</span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-error.svg" alt=""></span>오류</span>
+  <span class="k"><span class="ls"><img src="clawd/clawd-happy.svg" alt=""></span>끝</span>
+  <span class="sep"></span>
+  <span class="k">🔒 대외비 · <b style="color:var(--warn);font-weight:700">보호</b> 경로 · 점선 = 외부 · <b style="color:var(--warn)">공유</b> = 여러 명이 만짐</span>
+</div>
+<main>
+  <section class="panel" id="team">
+    <h2><b>에이전트</b> 총괄이 담당에게 일을 맡기면 선이 빛나고, 끝나면 점이 돌아온다</h2>
+    <div id="agentsBox"><svg id="teamSvg"></svg><div id="chiefRow"></div><div id="workers"></div></div>
+  </section>
+  <section class="panel" id="pipe">
+    <h2><b>코드·데이터 흐름</b> 상자 테두리 = 담당 색 · 에이전트가 파일을 만지면 점이 날아간다</h2>
+    <div id="pipeWrap"><div id="pipeInner"><svg id="flows"></svg></div></div>
+  </section>
+  <section class="panel" id="tl">
+    <div id="tlbar">
+      <button id="tlPause" title="일시정지 / 이어 보기">⏸ 멈춤</button>
+      <button id="tlRewind" title="처음부터 다시 보기">⏮ 처음부터</button>
+      <button id="tlSpeed" title="다시 보기 속도">1×</button>
+      <button id="tlLive" class="on" title="지금으로 돌아가기">● LIVE</button>
+      <span id="clock">--:--:--</span><span id="tlmode"></span>
+    </div>
+    <div id="track" title="누르면 그 시점부터 다시 본다"><canvas id="tlc"></canvas><div id="head"></div><div id="hoverT"></div></div>
+    <div class="tlaxis"><span id="t0"></span><span id="t1"></span></div>
+  </section>
+  <section class="panel" id="log">
+    <h2><b>활동 기록</b> 최근 순</h2>
+    <ul id="feed"></ul>
+  </section>
+</main>
+<svg id="fx"></svg>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const NS = "http://www.w3.org/2000/svg";
+const SPR = n => `clawd/clawd-${n}.svg`;
+const MODE = {read:"#4da3ff", write:"#ff9f43", run:"#3fd17a", delegate:"#c792ff"};
+const PALETTE = ["#b18cf2","#2ec4b6","#ff7eb6","#f2c94c","#7bd88f","#ff6b6b","#6cb4ff","#f0b44a"];
+const GUEST = {"general-purpose":"범용", "Explore":"탐색", "Plan":"계획", "claude":"Claude", "statusline-setup":"설정"};
+const STATE = {idle:"대기", sleep:"쉬는 중", think:"생각 중", read:"읽는 중", write:"쓰는 중", run:"실행 중",
+               carry:"맡기는 중", work:"일하는 중", error:"오류", done:"끝"};
+const SPRITE = {idle:"idle-living", sleep:"sleeping", think:"working-thinking", read:"idle-reading", write:"working-typing",
+                run:"working-building", carry:"working-carrying", work:"working-thinking", error:"error", done:"happy"};
+
+let MAP, MAIN, AG = {}, NODES = {}, globPats = [], prefixPats = [], links = {};
+let history = [], idToType = {}, sessions = new Map(), filterSess = "";
+let live = true, paused = false, playT = 0, cursor = 0, speed = 1, offset = -1, connected = false, lastUserScroll = 0;
+let toolCount = 0, particles = [], fxDirty = true, tlDirty = true, drawn = false, ANIM = false, progScroll = 0;
+const now = () => Date.now() / 1000;
+const clock = () => live ? now() : playT;   // 화면이 보여 주는 시각(다시 보기 중이면 그 시점)
+const STALE = 900;                          // 15분 넘게 소식 없는 위임·작업은 끝난 것으로 본다
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const hms = ts => { const d = new Date(ts * 1000), z = n => String(n).padStart(2, "0"); return `${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`; };
+const base = f => (f || "").split("/").filter(Boolean).pop() || "";
+function josa(w, pair){
+  const [a, b] = pair.split("/"), c = w.charCodeAt(w.length - 1);
+  const has = (c >= 0xAC00 && c <= 0xD7A3) ? (c - 0xAC00) % 28 > 0 : /[lmnr136780]$/i.test(w);
+  return w + (has ? a : b);
+}
+function hue(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || ""); if (!m) return null;
+  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (d < .08) return null;
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+// Clawd 원래 색(주황, 색상각 약 14도)을 각 에이전트 색으로 돌린다
+function tint(hex){ const h = hue(hex); return h === null ? "grayscale(.9) brightness(1.1)" : `hue-rotate(${Math.round(h - 14)}deg) saturate(1.25)`; }
+
+/* ---------- 지도 그리기 ---------- */
+async function init(){
+  MAP = await (await fetch("map.json", {cache:"no-store"})).json();
+  MAIN = MAP.main_agent || (MAP.agents[0] || {}).id;
+  document.title = (MAP.project || "에이전트") + " · 연구실";
+  $("#pname").textContent = MAP.project || "에이전트 연구실";
+  MAP.agents.forEach((a, i) => makeAgent({...a, color: a.color || PALETTE[i % PALETTE.length]}));
+  const inner = $("#pipeInner");
+  MAP.stages.forEach(s => {
+    const owner = AG[s.owner] || AG[MAIN];
+    const box = document.createElement("div");
+    box.className = "stage"; box.style.setProperty("--c", owner.color);
+    box.innerHTML = `<h3></h3><div class="owner"></div>`;
+    box.querySelector("h3").textContent = s.title;
+    box.querySelector(".owner").textContent = `${owner.name} 담당`;
+    s.nodes.forEach(n => {
+      const ow = AG[n.owner] || owner, e = document.createElement("div");
+      e.className = "node" + (n.sensitive ? " sensitive" : "") + (n.external ? " ext" : "") + (n.protected ? " protected" : "");
+      e.style.setProperty("--oc", ow.color);
+      e.innerHTML = `<span class="n"><span class="ico"></span><span class="lb"></span></span><div class="who"></div><span class="last"></span><span class="cnt">0</span><span class="shared">공유</span>`;
+      e.querySelector(".ico").textContent = n.sensitive ? "🔒" : n.external ? "↗" : "";
+      e.querySelector(".lb").textContent = n.label;
+      e.title = (n.note ? n.note + "\n" : "") + (n.paths || ["외부: " + n.external]).join("\n");
+      NODES[n.id] = {el: e, def: n, stage: s, owner: ow.id, count: 0, agents: new Map()};
+      box.appendChild(e);
+      (n.paths || []).forEach(p => (p.includes("*") ? globPats : prefixPats).push([p, n.id]));
+    });
+    inner.appendChild(box);
+  });
+  globPats = globPats.sort((a, b) => b[0].length - a[0].length).map(([p, id]) =>
+    [new RegExp("(^|/)" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*\*\//g, "(.*/)?").replace(/\*/g, "[^/]*") + "$"), id]);
+  prefixPats.sort((a, b) => b[0].length - a[0].length);
+  layout();
+  new ResizeObserver(layout).observe($("main"));
+  $("#pipeWrap").addEventListener("scroll", () => { if (Date.now() > progScroll) lastUserScroll = Date.now(); fxDirty = true; }, {passive:true});
+  addEventListener("scroll", () => fxDirty = true, {passive:true});
+  requestAnimationFrame(frame);
+  setInterval(tickSecond, 1000);
+  setInterval(reviewTick, 50);
+  poll();
+}
+
+function makeAgent(a){
+  const isMain = a.id === MAIN;
+  const el = document.createElement("div");
+  el.className = "agent" + (isMain ? " chief" : "");
+  el.style.setProperty("--c", a.color); el.style.setProperty("--tint", tint(a.color));
+  el.innerHTML = `<div class="spr"><img alt=""></div><div class="info"><div class="top"><span class="name"></span><span class="state">대기</span></div>
+    <div class="role"></div><div class="now">&nbsp;</div><div class="meta"></div></div>`;
+  el.querySelector(".name").textContent = a.name;
+  el.querySelector(".role").textContent = a.role || "";
+  el.querySelector(".role").title = a.role || "";
+  (isMain ? $("#chiefRow") : $("#workers")).appendChild(el);
+  const A = AG[a.id] = {...a, el, img: el.querySelector("img"), count: 0, working: 0, lastAct: 0, hold: 0, sprite: "", st: "idle"};
+  A.meta = () => el.querySelector(".meta").textContent = `도구 ${A.count}회` + (a.readonly ? " · 읽기만" : "");
+  A.meta(); setSprite(A, "idle", 0);
+  if (!isMain){
+    const p = document.createElementNS(NS, "path"); p.setAttribute("class", "branch"); p.style.setProperty("--c", a.color);
+    $("#teamSvg").appendChild(p); A.branch = p;
+  }
+  fxDirty = true;
+  return A;
+}
+function ensureAgent(t){
+  if (AG[t]) return t;
+  const n = Object.keys(AG).length;
+  makeAgent({id: t, name: GUEST[t] || t, role: "지도에 없는 에이전트", color: "#94a3b8"});
+  layout();
+  return t;
+}
+
+function rect(el){ return el.getBoundingClientRect(); }
+function layout(){
+  // 총괄 → 담당 가지 선
+  const box = rect($("#agentsBox")), M = AG[MAIN];
+  if (M){
+    // 조직도처럼: 총괄 아래로 줄기 → 가로 가지 → 각 담당 카드 위로 내려간다
+    const c = rect(M.el), wk = rect($("#workers"));
+    const ax = c.left - box.left + Math.min(c.width / 2, 64), ay = c.bottom - box.top;
+    const mid = ay + (wk.top - c.bottom) / 2, r = 8;
+    Object.values(AG).forEach(A => {
+      if (!A.branch) return;
+      const w = rect(A.el);
+      const bx = w.left - box.left + Math.min(w.width / 2, 44), by = w.top - box.top;
+      const dir = Math.sign(bx - ax), rr = Math.min(r, Math.abs(bx - ax) / 2);
+      A.branch.setAttribute("d", !dir ? `M${ax},${ay} V${by}` :
+        `M${ax},${ay} V${mid - rr} Q${ax},${mid} ${ax + dir * rr},${mid} H${bx - dir * rr} Q${bx},${mid} ${bx},${mid + rr} V${by}`);
+    });
+  }
+  // 파이프라인 화살표
+  const svg = $("#flows"), inner = $("#pipeInner"), ib = rect(inner);
+  svg.setAttribute("width", inner.scrollWidth); svg.setAttribute("height", inner.scrollHeight);
+  svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3a4859"/></marker></defs>`;
+  (MAP.flows || []).forEach(([f, t]) => {
+    if (!NODES[f] || !NODES[t]) return;
+    const A = rect(NODES[f].el), B = rect(NODES[t].el), side = B.left > A.right - 4;
+    const ax = (side ? A.right : A.left + A.width / 2) - ib.left, ay = (side ? A.top + A.height / 2 : A.bottom) - ib.top;
+    const bx = (side ? B.left : B.left + B.width / 2) - ib.left, by = (side ? B.top + B.height / 2 : B.top) - ib.top;
+    const p = document.createElementNS(NS, "path");
+    const dx = Math.max(16, Math.abs(bx - ax) / 2), dy = Math.max(16, Math.abs(by - ay) / 2);
+    p.setAttribute("d", side ? `M${ax},${ay} C${ax + dx},${ay} ${bx - dx},${by} ${bx},${by}` : `M${ax},${ay} C${ax},${ay + dy} ${bx},${by - dy} ${bx},${by}`);
+    p.setAttribute("class", "flow"); p.setAttribute("marker-end", "url(#arr)"); p.dataset.f = f; p.dataset.t = t;
+    svg.appendChild(p);
+  });
+  fxDirty = tlDirty = true;
+}
+
+/* ---------- 캐릭터 상태 ---------- */
+function setSprite(A, st, holdMs = 2600){
+  A.st = st;
+  const name = (st === "write" || st === "work") && A.id === MAIN ? "working-typing-boss" : SPRITE[st];
+  if (A.sprite !== name){ A.sprite = name; A.img.src = SPR(name); }
+  A.hold = Date.now() + holdMs;
+  const busy = !["idle", "sleep", "done"].includes(st);
+  A.el.classList.toggle("busy", busy && st !== "error");
+  A.el.classList.toggle("err", st === "error");
+  A.el.querySelector(".state").textContent = STATE[st];
+}
+function settle(A){
+  if (Date.now() < A.hold) return;
+  const age = clock() - A.lastAct;
+  const want = A.working > 0 && age < STALE ? "work" : (A.lastAct && age > 90) || (!A.lastAct && A.id !== MAIN) ? "sleep" : "idle";
+  if (A.st !== want) setSprite(A, want, 0);
+}
+function nowLine(A, text){ A.el.querySelector(".now").textContent = text || " "; A.el.querySelector(".now").title = text || ""; }
+
+/* ---------- 지도 찾기 ---------- */
+function nodeFor(path){
+  for (const [re, id] of globPats) if (re.test(path)) return id;
+  for (const [p, id] of prefixPats) if (path === p || path.startsWith(p) || p === path + "/") return id;
+  return null;
+}
+function extNode(e){
+  const x = MAP.externals || {}; if (!e.external) return null;
+  return x[`${e.external}:${e.mode}`] || x[e.external] || null;
+}
+function agentOf(e){
+  let t = e.agent || e.agent_type || (e.agent_id && idToType[e.agent_id]);
+  if (!t) t = e.agent_id ? "general-purpose" : MAIN;
+  return ensureAgent(String(t).replace(/^.*:/, ""));
+}
+const NAME = id => (AG[id] || {}).name || id;
+
+/* ---------- 효과: 날아가는 점 ---------- */
+function center(el){ const r = rect(el); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; }
+function clampToPipe(p){
+  const w = rect($("#pipeWrap"));
+  return {x: Math.min(Math.max(p.x, w.left + 6), w.right - 6), y: Math.min(Math.max(p.y, w.top + 6), w.bottom - 6)};
+}
+function fly(fromEl, toEl, color, dur = 800, delay = 0){
+  particles.push({kind: "fly", from: () => center(fromEl.querySelector(".spr") || fromEl), to: () => clampToPipe(center(toEl)), color, t0: performance.now() + delay, dur});
+}
+function along(A, color, back, delay = 0, dur = 1100){
+  if (!A || !A.branch) return;
+  particles.push({kind: "branch", path: A.branch, color, back, t0: performance.now() + delay, dur});
+}
+function frame(t){
+  const fx = $("#fx"), team = $("#teamSvg");
+  if (particles.length || fxDirty || drawn){
+    drawn = particles.length > 0;
+    fx.querySelectorAll("circle").forEach(c => c.remove());
+    team.querySelectorAll("circle").forEach(c => c.remove());
+    particles = particles.filter(p => {
+      const k = (t - p.t0) / p.dur; if (k < 0) return true; if (k > 1) return false;
+      let x, y;
+      if (p.kind === "fly"){
+        const a = p.from(), b = p.to(), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - 40;
+        x = (1 - e) ** 2 * a.x + 2 * (1 - e) * e * cx + e * e * b.x; y = (1 - e) ** 2 * a.y + 2 * (1 - e) * e * cy + e * e * b.y;
+      } else {
+        const L = p.path.getTotalLength(); if (!L) return false;
+        const pt = p.path.getPointAtLength((p.back ? 1 - k : k) * L); x = pt.x; y = pt.y;
+      }
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("cx", x); c.setAttribute("cy", y); c.setAttribute("r", p.kind === "fly" ? 5 : 4.5);
+      c.setAttribute("fill", p.color); c.style.filter = `drop-shadow(0 0 5px ${p.color})`;
+      (p.kind === "fly" ? fx : team).appendChild(c);
+      return true;
+    });
+    fxDirty = false;
+  }
+  // 위임 중인 가지에는 점이 계속 흐른다
+  Object.values(links).forEach(L => {
+    if (hot(L) && !paused && t > (L.next || 0)){ L.next = t + 900; along(AG[L.to], AG[L.from].color, false); }
+  });
+  requestAnimationFrame(frame);
+}
+
+function hitNode(N, aid, mode, animate, ts){
+  const A = AG[aid], el = N.el, col = MODE[mode] || MODE.run;
+  N.count++; el.classList.add("touched"); el.querySelector(".cnt").textContent = N.count;
+  if (!N.agents.has(aid)){
+    N.agents.set(aid, 1);
+    const s = document.createElement("span"); s.style.setProperty("--c", A.color); s.textContent = A.name.slice(0, 1); s.title = A.name;
+    el.querySelector(".who").appendChild(s);
+  }
+  if (N.agents.size > 1){ el.classList.add("multi"); el.querySelector(".shared").textContent = `공유 ${N.agents.size}`; }
+  el.querySelector(".last").textContent = `${A.name} · ${({read:"읽음", write:"씀", run:"실행"})[mode] || "만짐"} · ${hms(ts)}`;
+  if (!animate) return;
+  const go = () => {
+    el.style.setProperty("--hc", col); el.classList.add("hit");
+    clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("hit"), 2200);
+    el.querySelectorAll(".pop").forEach(p => p.remove());
+    const pop = document.createElement("img"); pop.className = "pop"; pop.src = SPR("mini-crabwalk"); pop.style.setProperty("--tint", tint(A.color));
+    el.appendChild(pop); setTimeout(() => pop.remove(), 1900);
+    $("#flows").querySelectorAll("path.flow").forEach(p => { if (p.dataset.f === N.def.id || p.dataset.t === N.def.id){
+      p.style.setProperty("--hc", col); p.classList.add("hot"); setTimeout(() => p.classList.remove("hot"), 2000); } });
+  };
+  revealNode(el);
+  fly(A.el, el, col, 800);
+  setTimeout(go, 780);
+}
+function revealNode(el){
+  const w = $("#pipeWrap"), r = rect(el), wr = rect(w);
+  if (Date.now() - lastUserScroll < 6000) return;
+  if (r.left < wr.left || r.right > wr.right){
+    progScroll = Date.now() + 900;
+    w.scrollTo({left: w.scrollLeft + (r.left - wr.left) - wr.width / 2 + r.width / 2, behavior: "smooth"});
+  }
+}
+
+/* ---------- 쉬운 문장 ---------- */
+const FRIENDLY = {TodoWrite:"할 일 목록 정리", Skill:"스킬 사용", ToolSearch:"도구 찾기", AskUserQuestion:"사용자에게 질문",
+  WebFetch:"웹 문서 읽기", WebSearch:"웹 검색", Grep:"내용 찾기", Glob:"파일 찾기", LS:"폴더 보기", Monitor:"진행 지켜보기"};
+const EXTNAME = {notion:"노션", drive:"드라이브", github:"GitHub", slack:"슬랙", figma:"Figma", web:"웹"};
+function toolName(t){ if (FRIENDLY[t]) return FRIENDLY[t]; const m = /^mcp__(.+?)__(.+)$/.exec(t || ""); return m ? `${m[2]} (${m[1].replace(/^claude_ai_/, "")})` : t; }
+function sentence(e, aid, nodeLabels){
+  const A = esc(NAME(aid)), f = (e.files || [])[0], fn = esc(base(f)), where = nodeLabels.length ? `→ ${nodeLabels.join(", ")}` : "";
+  const NAMEX = id => esc(NAME(id));
+  const S = (txt, sub, cls) => ({txt, sub, cls});
+  if (e.event === "SessionStart") return S(`세션이 시작됨`, e.source ? `(${e.source})` : "");
+  if (e.event === "UserPromptSubmit") return S(`<b>${josa(NAMEX(aid), "이/가")}</b> 새 요청을 받음`, "사용자 메시지 또는 완료 알림");
+  if (e.event === "Stop") return S(`<b>${josa(NAMEX(aid), "이/가")}</b> 답변을 마침`, "총괄 → 사용자");
+  if (e.event === "SubagentStart") return S(`<b>${josa(A, "이/가")}</b> 맡은 일을 시작함`, "");
+  if (e.event === "SubagentStop") return S(`<b>${josa(A, "이/가")}</b> ${NAMEX(MAIN)}에게 결과를 보고함`, "");
+  if (e.event === "PostToolUseFailure") return S(`<b>${A}</b>의 ${esc(toolName(e.tool))} 실패`, [e.desc, fn].filter(Boolean).join(" · "), "fail");
+  const who = `<b>${josa(A, "이/가")}</b>`;
+  if (e.delegate) return S(`${who} <b style="color:${esc((AG[e.delegate] || {}).color || "inherit")}">${NAMEX(e.delegate)}</b>에게 일을 맡김`, e.desc || "");
+  if (e.external){
+    const X = esc(EXTNAME[e.external] || e.external);
+    return S(e.mode === "write" ? `${who} ${X}에 기록함` : `${who} ${X}에서 찾아봄`, [e.desc, toolName(e.tool), where].filter(Boolean).join(" · "));
+  }
+  if (e.tool === "Bash") return S(`${who} 명령 실행${e.desc ? ": " + esc(e.desc) : ""}`, [(e.files || []).map(base).slice(0, 3).join(", "), where].filter(Boolean).join(" "));
+  if (e.mode === "write") return S(`${who} ${fn || "파일"} ${e.tool === "Write" ? "작성" : "수정"}`, [f, where].filter(Boolean).join(" "));
+  if (e.mode === "read") return S(e.tool === "Read" ? `${who} ${fn || "파일"} 읽음` : `${who} ${fn ? fn + "에서 " : ""}${esc(toolName(e.tool))}`, [f, where].filter(Boolean).join(" "));
+  return S(`${who} ${esc(toolName(e.tool))}`, e.desc || "");
+}
+function feed(e, aid, s){
+  const ul = $("#feed"); const em = ul.querySelector(".empty"); if (em) em.remove();
+  const li = document.createElement("li");
+  li.className = (s.cls || "") + (ANIM ? " new" : "");
+  li.style.setProperty("--c", (AG[aid] || {}).color || "#94a3b8");
+  li.innerHTML = `<time></time><i class="d"></i><span><span class="txt"></span><span class="sub"></span></span>`;
+  li.querySelector("time").textContent = hms(e.ts);
+  li.querySelector(".txt").innerHTML = s.txt; // 틀은 이 파일이 만들고, 기록에서 온 글자는 sentence()에서 이스케이프했다
+  if (s.tag){ const t = document.createElement("span"); t.className = "tag"; t.textContent = s.tag; li.querySelector(".txt").appendChild(t); }
+  li.querySelector(".sub").textContent = s.sub || ""; li.querySelector(".sub").title = s.sub || "";
+  ul.prepend(li); while (ul.children.length > 300) ul.lastChild.remove();
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"})[c]);
+
+/* ---------- 이벤트 하나 처리 ---------- */
+function apply(e, animate){
+  if (e.event === "SubagentStart" && e.agent_id && e.agent_type) idToType[e.agent_id] = e.agent_type;
+  const aid = agentOf(e), A = AG[aid], ev = e.event;
+  // 사람이 볼 문장에는 이름을 이스케이프한 뒤 넣는다
+  ANIM = animate;
+  if (e.desc) e = {...e, desc: String(e.desc)};
+  const touch = () => { A.lastAct = e.ts || now(); };
+
+  if (ev === "SessionStart"){ feed(e, aid, sentence(e, aid, [])); return; }
+  if (ev === "UserPromptSubmit"){ feed(e, aid, sentence(e, aid, [])); A.working = Math.max(A.working, 1); touch();
+    if (animate){ setSprite(A, "think"); nowLine(A, "💬 요청 확인 중"); } return; }
+  if (ev === "Stop"){ feed(e, aid, sentence(e, aid, [])); A.working = 0; touch();
+    if (animate){ setSprite(A, "done", 3000); nowLine(A, "✅ 답변 완료"); } return; }
+  if (ev === "SubagentStart"){ feed(e, aid, sentence(e, aid, [])); A.working++; touch();
+    if (animate){ setSprite(A, "work", 1500); nowLine(A, "📥 일을 받음"); } return; }
+  if (ev === "SubagentStop"){ report(aid, e, animate, true); return; }
+  if (ev === "PostToolUse"){ if (e.delegate) report(ensureAgent(e.delegate), e, animate, false, aid); return; }
+  if (ev !== "PreToolUse" && ev !== "PostToolUseFailure") return;
+
+  if (ev === "PostToolUseFailure"){ feed(e, aid, sentence(e, aid, [])); touch();
+    if (animate){ setSprite(A, "error", 2600); nowLine(A, "⚠ " + toolName(e.tool) + " 실패"); } return; }
+
+  toolCount++; A.count++; A.meta(); touch();
+  if (e.delegate){
+    const to = ensureAgent(e.delegate), key = `${aid}>${to}`;
+    const L = links[key] = links[key] || {from: aid, to, active: 0};
+    L.active++;
+    feed(e, aid, sentence({...e, delegate: to}, aid, []));
+    AG[to].lastAct = e.ts; L.ts = e.ts;
+    if (animate){
+      setSprite(A, "carry", 2200); nowLine(A, `📦 ${NAME(to)}에게 맡김` + (e.desc ? ": " + e.desc : ""));
+      nowLine(AG[to], "📥 맡은 일: " + (e.desc || ""));
+      setSprite(AG[to], "work", 1500);
+    }
+    branchClass(to);
+    return;
+  }
+  const files = e.files || [];
+  const ids = new Set(files.map(nodeFor).filter(Boolean));
+  const xn = extNode(e); if (xn && NODES[xn]) ids.add(xn);
+  const nodes = [...ids].map(id => NODES[id]).filter(Boolean);
+  const s = sentence(e, aid, nodes.map(n => n.def.label));
+  if (nodes.some(n => n.def.sensitive)){ s.cls = "warn"; s.tag = "🔒 대외비 자료"; }
+  else if (e.mode === "write" && nodes.some(n => n.def.protected)){ s.cls = "warn"; s.tag = "보호 경로 변경 · 감사 검토 대상"; }
+  feed(e, aid, s);
+  const mode = e.mode === "delegate" ? "run" : (e.mode || "run");
+  nodes.forEach((N, i) => animate ? setTimeout(() => hitNode(N, aid, mode, true, e.ts), i * 160) : hitNode(N, aid, mode, false, e.ts));
+  if (animate){
+    const st = e.external ? (mode === "write" ? "write" : "read") : (mode === "read" ? "read" : mode === "write" ? "write" : nodes.length ? "run" : "think");
+    setSprite(A, st, 2600);
+    const icon = {read:"📖", write:"✏️", run:"▶", think:"💭"}[st];
+    nowLine(A, `${icon} ${toolName(e.tool)} · ${base(files[0]) || e.desc || (e.external ? EXTNAME[e.external] : "")}`);
+  }
+}
+function report(aid, e, animate, fromStop, parent){
+  // 담당이 일을 끝내고 맡긴 쪽으로 결과를 돌려준다. SubagentStop 이 먼저 오면 PostToolUse(Agent)는 건너뛴다.
+  const cands = Object.values(links).filter(L => L.to === aid && (!parent || L.from === parent));
+  const L = cands.find(L => L.active > 0) || cands[0];
+  if (!fromStop){
+    if (!L) return;
+    if (L.reported > 0){ L.reported--; return; }
+    if (L.active <= 0) return;
+  }
+  const A = AG[aid];
+  if (fromStop){ feed(e, aid, sentence(e, aid, [])); A.working = Math.max(0, A.working - 1); A.lastAct = e.ts; }
+  if (L && L.active > 0){ L.active--; if (fromStop) L.reported = (L.reported || 0) + 1; }
+  branchClass(aid);
+  if (animate && A){
+    setSprite(A, "done", 2600); nowLine(A, `✅ ${NAME(L ? L.from : MAIN)}에게 보고`);
+    A.branch && A.branch.classList.add("back"); setTimeout(() => { A.branch && A.branch.classList.remove("back"); }, 1600);
+    for (let i = 0; i < 3; i++) along(A, A.color, true, i * 220, 1000);
+  }
+}
+const hot = L => L.active > 0 && clock() - (L.ts || 0) < STALE;
+function branchClass(to){
+  const on = Object.values(links).some(L => L.to === to && hot(L));
+  AG[to] && AG[to].branch && AG[to].branch.classList.toggle("on", on);
+}
+
+/* ---------- 기록 받기 · 다시 보기 ---------- */
+function visible(e){ return !filterSess || e.session === filterSess; }
+function noteSession(e){
+  if (!e.session || sessions.has(e.session)) return;
+  sessions.set(e.session, e.ts);
+  const o = document.createElement("option"); o.value = e.session;
+  o.textContent = e.session === "demo" ? "시연" : `${e.session} (${hms(e.ts)}~)`;
+  $("#sess").appendChild(o);
+}
+function ingest(e){
+  history.push(e); noteSession(e); tlDirty = true;
+  if (live){ cursor = history.length; if (visible(e)) apply(e, true); }
+}
+function resetView(){
+  $("#feed").innerHTML = ""; toolCount = 0; links = {}; idToType = {};
+  Object.values(NODES).forEach(N => { N.count = 0; N.agents.clear(); N.el.classList.remove("touched", "hit", "multi");
+    N.el.querySelector(".who").innerHTML = ""; N.el.querySelector(".last").textContent = ""; });
+  Object.values(AG).forEach(A => { A.count = 0; A.working = 0; A.lastAct = 0; A.hold = 0; A.meta(); nowLine(A, ""); setSprite(A, "idle", 0);
+    A.branch && A.branch.classList.remove("on", "back"); });
+  particles = []; fxDirty = true;
+}
+function showEmpty(){
+  if (!$("#feed").children.length)
+    $("#feed").innerHTML = `<li class="empty">아직 기록이 없다. 이 프로젝트에서 Claude에게 일을 시키거나, 위의 "시연 재생"을 누르면 가짜 기록으로 화면이 움직인다.</li>`;
+}
+// t 시점까지의 기록을 움직임 없이 바로 그린다
+function seek(t){
+  resetView();
+  cursor = 0;
+  while (cursor < history.length && history[cursor].ts <= t){ if (visible(history[cursor])) apply(history[cursor], false); cursor++; }
+  playT = t; showEmpty(); tlDirty = true;
+}
+function goLive(){
+  while (cursor < history.length){ if (visible(history[cursor])) apply(history[cursor], false); cursor++; }
+  live = true; paused = false; updateModeUI();
+}
+function reviewTick(){
+  if (live || paused) return;
+  const vis = i => i < history.length && !visible(history[i]);
+  while (vis(cursor)) cursor++;
+  if (cursor >= history.length){ goLive(); return; }
+  const next = history[cursor].ts;
+  if (next - playT > 3) playT = next - .5;              // 빈 시간은 건너뛴다
+  playT += .05 * speed;
+  while (cursor < history.length && history[cursor].ts <= playT){
+    if (visible(history[cursor])) apply(history[cursor], speed <= 8); cursor++;
+  }
+  tlDirty = true;
+}
+function updateModeUI(){
+  const lv = $("#live");
+  lv.className = "pill " + (!connected ? "off" : live ? "on" : "review");
+  $("#liveTxt").textContent = !connected ? "연결 끊김 (./labmap 실행)" : live ? "LIVE" : paused ? "일시정지" : "다시 보기";
+  $("#tlPause").textContent = (live || !paused) ? "⏸ 멈춤" : "▶ 이어 보기";
+  $("#tlLive").classList.toggle("on", live);
+  $("#tlmode").textContent = live ? "실시간" : paused ? "멈춤 · 새 기록은 쌓아 둔다" : `다시 보기 ${speed}× · 빈 시간은 건너뜀`;
+}
+$("#tlPause").onclick = () => {
+  if (live){ live = false; paused = true; playT = now(); }
+  else paused = !paused;
+  updateModeUI();
+};
+$("#tlRewind").onclick = () => { const first = history.find(visible); if (!first) return; live = false; paused = false; seek(first.ts - .5); updateModeUI(); };
+$("#tlSpeed").onclick = () => { speed = {1:2, 2:4, 4:8, 8:1}[speed]; $("#tlSpeed").textContent = speed + "×"; updateModeUI(); };
+$("#tlLive").onclick = () => goLive();
+$("#track").onclick = ev => {
+  const [t0, t1] = range(), r = rect($("#track")), t = t0 + (t1 - t0) * (ev.clientX - r.left) / r.width;
+  live = false; paused = false; seek(t); updateModeUI();
+};
+$("#track").onmousemove = ev => {
+  const [t0, t1] = range(), r = rect($("#track")), h = $("#hoverT");
+  h.style.display = "block"; h.textContent = hms(t0 + (t1 - t0) * (ev.clientX - r.left) / r.width);
+  h.style.left = Math.min(r.width - 60, Math.max(0, ev.clientX - r.left + 6)) + "px";
+};
+$("#track").onmouseleave = () => $("#hoverT").style.display = "none";
+
+function range(){
+  const vis = history.filter(visible);
+  const t1 = Math.max(now(), vis.length ? vis[vis.length - 1].ts : 0);
+  const t0 = vis.length ? Math.min(vis[0].ts, t1 - 60) : t1 - 60;
+  return [t0 - 2, t1];
+}
+function drawTimeline(){
+  const cv = $("#tlc"), r = rect(cv), dpr = devicePixelRatio || 1;
+  if (!r.width) return;
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr);
+  const [t0, t1] = range(), X = t => (t - t0) / (t1 - t0) * r.width;
+  history.forEach(e => {
+    if (!visible(e)) return;
+    const a = AG[e.agent || e.agent_type] || AG[idToType[e.agent_id]] || (e.agent_id ? null : AG[MAIN]);
+    const big = e.delegate || e.event === "SubagentStart" || e.event === "SubagentStop";
+    g.fillStyle = e.event === "PostToolUseFailure" ? "#ff6b6b" : (a ? a.color : "#94a3b8");
+    g.globalAlpha = e.event === "PreToolUse" || big ? 1 : .5;
+    const h = big ? r.height - 8 : e.event === "PreToolUse" ? 14 : 8;
+    g.fillRect(X(e.ts) - 1, (r.height - h) / 2, big ? 3 : 2, h);
+  });
+  $("#head").style.left = (live ? r.width : X(playT)) + "px";
+  $("#t0").textContent = hms(t0); $("#t1").textContent = live ? "지금" : hms(t1);
+}
+function tickSecond(){
+  $("#clock").textContent = hms(live ? now() : playT);
+  Object.values(AG).forEach(settle);
+  $("#nWork").textContent = Object.values(AG).filter(A => (A.working > 0 && clock() - A.lastAct < STALE) || clock() - A.lastAct < 8).length;
+  Object.keys(AG).forEach(branchClass);
+  $("#nTools").textContent = toolCount;
+  if (live) tlDirty = true;
+}
+setInterval(() => { if (tlDirty){ tlDirty = false; drawTimeline(); } }, 250);
+
+async function poll(){
+  try{
+    const r = await (await fetch("events?offset=" + offset, {cache:"no-store"})).json();
+    if (!connected){ connected = true; updateModeUI(); }
+    if (offset < 0 || r.reset){
+      const demo = history.filter(e => e.session === "demo");
+      history = r.events.concat(demo).sort((a, b) => a.ts - b.ts);
+      history.forEach(noteSession);
+      seek(Infinity); cursor = history.length; live = true; paused = false; updateModeUI();
+    } else r.events.forEach(ingest);
+    offset = r.offset;
+  }catch(err){ if (connected || offset < 0){ connected = false; updateModeUI(); } }
+  setTimeout(poll, 700);
+}
+$("#clear").onclick = () => { history = []; cursor = 0; resetView(); showEmpty(); tlDirty = true; goLive(); };
+$("#sess").onchange = ev => { filterSess = ev.target.value; seek(Infinity); cursor = history.length; goLive(); };
+
+/* ---------- 시연: 지도만 보고 가짜 하루를 만든다 ---------- */
+function demoScript(){
+  const all = MAP.stages.flatMap(s => s.nodes.map(n => ({...n, owner: n.owner || s.owner})));
+  const fileOf = n => (n.paths && n.paths[0] || "").replace(/\*\*\//g, "").replace(/\*/g, "example");
+  const local = all.filter(n => n.paths && !n.external);
+  const S = [], push = (t, e) => S.push([t, e]);
+  let t = 0, k = 0;
+  push(t, {event: "UserPromptSubmit", agent: MAIN});
+  const first = local[0]; if (first) push(t += 1.2, {event: "PreToolUse", agent: MAIN, tool: "Read", mode: "read", files: [fileOf(first)]});
+  const extR = all.find(n => n.external && (MAP.externals || {})[`${n.external}:read`] === n.id) || all.find(n => n.external);
+  if (extR) push(t += 1.4, {event: "PreToolUse", agent: MAIN, tool: `mcp__${extR.external}__search`, mode: "read", external: extR.external, desc: "근거 자료 찾기 (시연)"});
+  const workers = MAP.agents.filter(a => a.id !== MAIN);
+  let shared = null;
+  workers.forEach((w, i) => {
+    let own = local.filter(n => n.owner === w.id && !n.sensitive);
+    if (w.readonly) own = (local.filter(n => n.protected).length ? local.filter(n => n.protected) : shared ? [shared] : local.slice(-2)).slice(0, 2);
+    if (!own.length) own = local.filter(n => !n.sensitive).slice(i % 3, i % 3 + 1);
+    const ext = all.find(n => n.external && n.owner === w.id);
+    const id = "demo-" + (++k), start = (t += 2.6);
+    const stage = MAP.stages.find(s => s.nodes.some(n => n.id === own[0]?.id));
+    push(start, {event: "PreToolUse", agent: MAIN, tool: "Agent", mode: "delegate", delegate: w.id, desc: (stage ? stage.title.replace(/^[^\s]+\s/, "") : w.role || "") + " 맡기기"});
+    push(start + .5, {event: "SubagentStart", agent_id: id, agent_type: w.id, agent: w.id});
+    let u = start + 2.4;
+    const act = (e) => { push(u, {agent_id: id, agent_type: w.id, agent: w.id, event: "PreToolUse", ...e}); u += 1.6; };
+    if (own[0]) act({tool: "Read", mode: "read", files: [fileOf(own[0])]});
+    if (shared && !w.readonly && i === 1) act({tool: "Read", mode: "read", files: [fileOf(shared)]});
+    if (!w.readonly && own[0]){
+      act({tool: "Edit", mode: "write", files: [fileOf(own[0])]});
+      if (!shared) shared = own[0];
+    }
+    if (w.readonly && own[1]) act({tool: "Grep", mode: "read", files: [fileOf(own[1])]});
+    if (!w.readonly && own[1]){
+      act({tool: "Bash", mode: "run", files: [fileOf(own[1])], desc: "검사 실행"});
+      if (i === 2){ push(u - .8, {event: "PostToolUseFailure", agent_id: id, agent_type: w.id, agent: w.id, tool: "Bash", desc: "검사 실행"});
+        act({tool: "Bash", mode: "run", files: [fileOf(own[1])], desc: "고친 뒤 다시 실행"}); }
+    }
+    if (ext) act({tool: `mcp__${ext.external}__update`, mode: "write", external: ext.external, desc: "결과 올리기 (시연)"});
+    push(u + 1, {event: "SubagentStop", agent_id: id, agent_type: w.id, agent: w.id});
+    push(u + 1.2, {event: "PostToolUse", agent: MAIN, tool: "Agent", delegate: w.id});
+  });
+  const end = Math.max(...S.map(s => s[0])) + 2;
+  push(end, {event: "Stop", agent: MAIN});
+  return S.sort((a, b) => a[0] - b[0]);
+}
+let demoTimers = [];
+$("#demo").onclick = () => {
+  demoTimers.forEach(clearTimeout); demoTimers = [];
+  history = history.filter(e => e.session !== "demo");
+  if (!live) goLive();
+  if (filterSess && filterSess !== "demo"){ filterSess = ""; $("#sess").value = ""; }
+  const base0 = now();
+  demoScript().forEach(([t, e]) => demoTimers.push(setTimeout(() => ingest({...e, ts: base0 + t, session: "demo"}), t * 1000)));
+};
+
+init().then(() => { if (/[?&]demo/.test(location.search)) setTimeout(() => $("#demo").click(), 400); })
+      .catch(err => { document.body.insertAdjacentHTML("beforeend", `<p style="padding:16px;color:#ff6b6b">지도(map.json)를 읽지 못했다: ${esc(err.message)}</p>`); });
+</script>
+</body>
+</html>

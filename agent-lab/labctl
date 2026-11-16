@@ -1,0 +1,44 @@
+#!/bin/zsh
+# 에이전트 연구실 서버를 켜고 끈다. 각 프로젝트의 ./labmap 이 이 파일을 부른다.
+#   labctl <프로젝트루트> [start|up|stop|status]
+#     start   서버를 켜고 브라우저로 연다 (기본)
+#     up      서버만 켠다
+#     stop    서버를 끈다
+#     status  켜져 있는지 본다
+LAB="${0:A:h}"
+ROOT="${1:A}"
+CMD="${2:-start}"
+[[ -f "$ROOT/.lab/map.json" ]] || { echo "$ROOT/.lab/map.json 이 없다."; exit 1; }
+PY="$HOME/.venvs/work/bin/python"
+[[ -x "$PY" ]] || PY="$(command -v python3)"
+PORT="$("$PY" -I -c 'import json,sys; print(int(json.load(open(sys.argv[1], encoding="utf-8")).get("port", 8765)))' "$ROOT/.lab/map.json" 2>/dev/null)"
+[[ -n "$PORT" ]] || PORT=8765
+PIDF="$ROOT/.lab/live/server.pid"
+url() { echo "http://127.0.0.1:$PORT" }
+# 이 프로젝트의 연구실 서버가 응답하는지 (다른 프로그램이 같은 포트를 쓰면 아니다)
+alive() { curl -s --max-time 1 "$(url)/health" 2>/dev/null | grep -q "\"root\": \"${ROOT:t}\"" }
+
+up() {
+  if alive; then echo "이미 켜져 있다: $(url)"; return 0; fi
+  if lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "포트 $PORT 을 다른 프로그램이 쓰고 있다. (옛 지도 서버라면 그 프로그램을 끈 뒤 다시 실행)"; return 1
+  fi
+  mkdir -p "$ROOT/.lab/live"
+  nohup "$PY" -I "$LAB/server.py" "$ROOT" $PORT >/dev/null 2>&1 &
+  echo $! > "$PIDF"
+  for i in {1..20}; do alive && break; sleep 0.25; done
+  alive && echo "연구실 서버가 켜졌다: $(url)" || { echo "켜지지 않았다."; return 1; }
+}
+
+stop() {
+  if [[ -f "$PIDF" ]] && kill "$(cat "$PIDF")" 2>/dev/null; then rm -f "$PIDF"; echo "껐다."
+  else rm -f "$PIDF"; echo "켜져 있지 않다."; fi
+}
+
+case "$CMD" in
+  start)  up && open "$(url)" ;;
+  up)     up ;;
+  stop)   stop ;;
+  status) alive && echo "켜져 있다: $(url)" || echo "꺼져 있다." ;;
+  *)      echo "사용법: ./labmap [start|up|stop|status]"; exit 1 ;;
+esac

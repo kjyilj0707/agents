@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로젝트 관계 그래프</title>
+<style>
+  :root {
+    --bg: #0b0b16; --panel: #12121f; --panel2: #1a1a2c; --line: #2a2a42;
+    --text: #e8e8f4; --dim: #8a8aa6; --accent: #00f5ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.45 'Segoe UI', 'Malgun Gothic', sans-serif; overflow: hidden; }
+  #app { display: grid; grid-template-columns: 250px 1fr; height: 100%; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 14px 12px 20px; }
+  h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .2px; }
+  .sub { color: var(--dim); font-size: 11.5px; margin-bottom: 12px; }
+  .sec { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; margin: 16px 0 6px; }
+  input[type=search] { width: 100%; padding: 7px 9px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel2); color: var(--text); outline: none; }
+  input[type=search]:focus { border-color: var(--accent); }
+  .proj { display: flex; justify-content: space-between; gap: 6px; padding: 5px 8px; border-radius: 6px; cursor: pointer;
+    color: #cfd0e6; white-space: nowrap; }
+  .proj span:first-child { overflow: hidden; text-overflow: ellipsis; }
+  .proj:hover { background: var(--panel2); }
+  .proj.on { background: #00f5ff1f; color: #fff; box-shadow: inset 2px 0 0 var(--accent); }
+  .proj .n { color: var(--dim); font-size: 11px; }
+  .proj.rootrow { margin-top: 8px; font-weight: 600; color: #fff; }
+  #projects .proj:not(.rootrow) { padding-left: 22px; }
+  #projects .proj:first-child { padding-left: 8px; }
+  #projects .proj.rootrow.under { padding-left: 16px; }
+  #projects .proj.under:not(.rootrow) { padding-left: 38px; }
+  .root { color: var(--dim); font-size: 11px; margin: 8px 0 2px 8px; }
+  .seg { display: flex; background: var(--panel2); border-radius: 7px; padding: 2px; }
+  .seg button { flex: 1; border: 0; background: none; color: var(--dim); padding: 6px; border-radius: 5px; cursor: pointer; font: inherit; }
+  .seg button.on { background: #00f5ff26; color: #fff; }
+  label.chk { display: flex; align-items: center; gap: 7px; padding: 2px 4px; cursor: pointer; color: #cfd0e6; }
+  label.chk input { accent-color: var(--accent); margin: 0; }
+  .sw { width: 22px; height: 0; border-top: 2px solid; display: inline-block; }
+  .dot, .sw { forced-color-adjust: none; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; box-shadow: 0 0 6px currentColor; background: currentColor; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; color: #cfd0e6; }
+  .legend div { display: flex; align-items: center; gap: 6px; }
+  .hint { color: var(--dim); font-size: 11.5px; margin-top: 14px; line-height: 1.6; }
+  main { position: relative; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas.drag { cursor: grabbing; }
+  #tip { position: absolute; pointer-events: none; background: #000c; border: 1px solid var(--line); border-radius: 6px;
+    padding: 5px 8px; font-size: 12px; display: none; max-width: 420px; }
+  #tip .p { color: var(--dim); font-size: 11px; }
+  #info { position: absolute; top: 12px; right: 12px; width: 330px; max-height: calc(100% - 24px); overflow-y: auto;
+    background: #12121ff2; border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: none;
+    backdrop-filter: blur(6px); }
+  #info h2 { font-size: 14px; margin: 0 0 3px; word-break: break-all; }
+  #info .p { color: var(--dim); font-size: 11.5px; word-break: break-all; }
+  #info .btns { display: flex; gap: 6px; margin: 10px 0 4px; flex-wrap: wrap; }
+  #info button, .btn { background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 6px;
+    padding: 5px 9px; cursor: pointer; font: inherit; font-size: 12px; }
+  #info button:hover, .btn:hover { border-color: var(--accent); }
+  #info .grp { margin-top: 10px; }
+  #info .grp b { font-size: 11.5px; color: var(--dim); font-weight: 600; display: block; margin-bottom: 3px; }
+  #info .it { padding: 3px 6px; border-radius: 5px; cursor: pointer; display: flex; gap: 7px; align-items: center; }
+  #info .it:hover { background: var(--panel2); }
+  #info .it span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #close { position: absolute; top: 8px; right: 10px; background: none !important; border: 0 !important; font-size: 16px !important; color: var(--dim) !important; }
+  #crumb { position: absolute; top: 12px; left: 14px; right: 360px; z-index: 2; font-size: 14px; pointer-events: none; }
+  #crumb .path { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  #crumb a { pointer-events: auto; color: #cfd0e6; cursor: pointer; padding: 3px 8px; border-radius: 6px; background: #ffffff10; }
+  #crumb a:hover { background: #00f5ff26; color: #fff; }
+  #crumb b { padding: 3px 8px; border-radius: 6px; background: #00f5ff26; color: #fff; font-weight: 600; }
+  #crumb .say { color: var(--dim); font-size: 12.5px; margin-top: 7px; }
+  details summary { list-style: none; }
+  details summary::before { content: '▸ '; }
+  details[open] summary::before { content: '▾ '; }
+  #stats { position: absolute; left: 12px; bottom: 10px; color: var(--dim); font-size: 11.5px; pointer-events: none; }
+  #zoom { position: absolute; right: 12px; bottom: 10px; display: flex; gap: 4px; }
+  #agents { position: absolute; right: 12px; bottom: 46px; display: none; gap: 4px; align-items: center; }
+  #agents span { color: var(--dim); font-size: 11.5px; margin-right: 4px; }
+  @media (max-width: 700px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 42% 58%; }
+    #info { width: auto; left: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside>
+    <h1>🧠 프로젝트 관계 그래프</h1>
+    <div class="sub" id="gen"></div>
+    <input id="q" type="search" placeholder="파일 이름 검색 (Enter로 이동)">
+    <div class="sec">보기</div>
+    <div class="seg" id="layout">
+      <button data-v="force" class="on">신경망</button>
+      <button data-v="layer">흐름 레이어</button>
+    </div>
+    <div class="sec">프로젝트</div>
+    <div id="projects"></div>
+    <div class="sec">색 읽는 법</div>
+    <div class="legend" id="legend"></div>
+    <div class="legend" id="legend2" style="margin-top:6px"></div>
+    <div class="hint">
+      클릭: 안으로 들어가기 / 그 파일의 흐름만 보기<br>
+      더블클릭: VS Code에서 열기<br>
+      휠: 확대 · 빈 곳 드래그: 이동 · Esc: 뒤로
+    </div>
+    <details>
+      <summary class="sec" style="cursor:pointer">세부 설정</summary>
+      <div class="sec">관계</div>
+      <div id="types"></div>
+      <div class="sec">표시</div>
+      <label class="chk"><input type="checkbox" id="hideIso" checked> 연결 없는 파일 숨기기</label>
+      <label class="chk"><input type="checkbox" id="hideCopy" checked> 사본 폴더(제출자료 등) 숨기기</label>
+      <label class="chk"><input type="checkbox" id="labels" checked> 이름 항상 표시</label>
+      <label class="chk"><input type="checkbox" id="pulse" checked> 흐름 애니메이션</label>
+    </details>
+  </aside>
+  <main>
+    <div id="crumb"></div>
+    <canvas id="cv"></canvas>
+    <div id="tip"></div>
+    <div id="info"></div>
+    <div id="stats"></div>
+    <div id="zoom"><button class="btn" id="fit">화면 맞춤</button></div>
+    <div id="agents"><span id="agentsLabel"></span><label class="chk" title="프로젝트나 상위 폴더를 누르면 Claude 세션과 에이전트 연구실을 함께 연다"><input type="checkbox" id="agAuto" checked> 누르면 바로 열기</label><button class="btn" id="agFlow">🤖 에이전트 보기</button><button class="btn" id="agTerm">▶ Claude + 연구실</button></div>
+  </main>
+</div>
+<script>
+const G = /*__GRAPH_DATA__*/null;
+
+const KIND = {
+  code:     { c: '#00f5ff', t: '코드 .py' },
+  notebook: { c: '#ff9f1c', t: '노트북' },
+  data:     { c: '#39ff88', t: '데이터' },
+  media:    { c: '#ff3df2', t: '그림·음원' },
+  web:      { c: '#ffe14d', t: '웹 html/js' },
+  doc:      { c: '#b18cff', t: '문서' },
+  folder:   { c: '#8a9bb8', t: '폴더' },
+};
+const TYPE = {
+  read:    { c: '#39ff88', t: '읽기 (데이터 → 코드)', flow: true },
+  write:   { c: '#ff3df2', t: '생성 (코드 → 결과)', flow: true },
+  import:  { c: '#00f5ff', t: 'import (모듈 → 사용처)', flow: true },
+  use:     { c: '#7f8fa6', t: '경로 참조', flow: false },
+  mention: { c: '#b18cff', t: '문서 언급', flow: false, dash: [4, 4] },
+  copy:    { c: '#d0d0e0', t: '같은 내용 사본', flow: false, dash: [1.5, 4] },
+  tree:    { c: '#ffffff', t: '포함', flow: false, pulse: true, hidden: true },
+};
+const COPY_DIR = /(^|\/)(제출자료|submission|backup|백업|copy|사본)(\/|$)/i;
+
+const vscodeApi = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
+function openPath(n, reveal) {
+  const folder = n.group || reveal;
+  if (vscodeApi) { vscodeApi.postMessage({ type: folder ? 'reveal' : 'open', path: n.path }); return; }
+  location.href = folder
+    ? 'vscode://kjyil.project-map-reveal/reveal?path=' + encodeURIComponent(n.path)
+    : 'vscode://file/' + encodeURI(n.path);
+}
+
+// ───────────── 데이터 준비 ─────────────
+const byId = new Map(G.nodes.map(n => [n.id, n]));
+G.links.forEach(l => { l.s = byId.get(l.source); l.t = byId.get(l.target); });
+G.links = G.links.filter(l => l.s && l.t);
+const projById = new Map(G.projects.map(p => [p.id, p]));
+
+const state = {
+  project: '*',
+  layout: 'force',
+  types: { read: true, write: true, import: true, use: false, mention: false, copy: false },
+  hideIso: true, hideCopy: true, labels: true, pulse: true,
+  sel: null, hover: null, query: '', focus: null, depth: 2, root: null,
+};
+function count(pid) { return pid === '*' ? G.nodes.length : G.nodes.filter(n => n.project === pid).length; }
+function localGet(k) { try { return localStorage.getItem('pg.' + k); } catch (e) { return null; } }
+function localSet(k, v) { try { localStorage.setItem('pg.' + k, v); } catch (e) {} }
+
+document.getElementById('gen').textContent = `생성 ${G.generated} · 파일 ${G.nodes.length} · 관계 ${G.links.length}`;
+
+// 사이드바
+const projEl = document.getElementById('projects');
+function renderProjects() {
+  projEl.innerHTML = '';
+  const all = document.createElement('div');
+  all.className = 'proj' + (state.project === '*' && !state.root ? ' on' : '');
+  all.innerHTML = `<span>🌐 전체 작업공간</span><span class="n">${G.nodes.length}</span>`;
+  all.onclick = () => setRoot(null);
+  projEl.appendChild(all);
+  let lastRoot = null;
+  // MANAGE 를 맨 위에, 나머지 상위 폴더는 그 아래로 들여쓴다
+  const ordered = [...G.projects].sort((a, b) => (b.root === MANAGER) - (a.root === MANAGER));
+  for (const p of ordered) {
+    const under = MANAGER && p.root !== MANAGER ? ' under' : '';
+    if (p.root !== lastRoot) {
+      const r = document.createElement('div');
+      r.className = 'proj rootrow' + under + (state.project === '*' && state.root === p.root ? ' on' : '');
+      const n = G.projects.filter(q => q.root === p.root).length;
+      r.innerHTML = `<span>${under ? '└ ' : ''}🗂 ${esc(p.root)}</span><span class="n">${p.root === MANAGER ? '관리 · ' : ''}프로젝트 ${n}</span>`;
+      const root = p.root; r.onclick = () => setRoot(root);
+      projEl.appendChild(r);
+      lastRoot = p.root;
+    }
+    const d = document.createElement('div');
+    d.className = 'proj' + under + (state.project === p.id ? ' on' : '');
+    const links = G.links.filter(l => l.project === p.id).length;
+    d.innerHTML = `<span title="${p.name}">${p.name}</span><span class="n">${count(p.id)} · ${links}</span>`;
+    d.onclick = () => setProject(p.id);
+    projEl.appendChild(d);
+  }
+}
+const typesEl = document.getElementById('types');
+for (const [k, v] of Object.entries(TYPE)) {
+  if (v.hidden) continue;
+  const lab = document.createElement('label'); lab.className = 'chk';
+  lab.innerHTML = `<input type="checkbox" ${state.types[k] ? 'checked' : ''}> <span class="sw" style="border-color:${v.c};${v.dash ? 'border-top-style:dashed' : ''}"></span> ${v.t}`;
+  lab.querySelector('input').onchange = e => { state.types[k] = e.target.checked; rebuild(false); };
+  typesEl.appendChild(lab);
+}
+const legendEl = document.getElementById('legend');
+for (const k of ['read', 'write', 'import']) {
+  const d = document.createElement('div');
+  d.innerHTML = `<span class="sw" style="border-color:${TYPE[k].c}"></span>${TYPE[k].t.split(' (')[0]}`;
+  document.getElementById('legend2').appendChild(d);
+}
+for (const v of Object.values(KIND)) {
+  const d = document.createElement('div');
+  d.innerHTML = `<span class="dot" style="color:${v.c}"></span>${v.t}`;
+  legendEl.appendChild(d);
+}
+for (const id of ['hideIso', 'hideCopy']) {
+  document.getElementById(id).onchange = e => { state[id] = e.target.checked; rebuild(true); };
+}
+document.getElementById('labels').onchange = e => { state.labels = e.target.checked; };
+document.getElementById('pulse').onchange = e => { state.pulse = e.target.checked; };
+document.querySelectorAll('#layout button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#layout button').forEach(x => x.classList.toggle('on', x === b));
+  state.layout = b.dataset.v;
+  if (state.focus) exitFocus(); else applyLayout(true);
+});
+
+// ───────────── 그래프 상태 ─────────────
+let nodes = [], links = [], adjOut = new Map(), adjIn = new Map(), clusters = [];
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const view = { x: 0, y: 0, k: 1 };
+
+function setProject(pid) {
+  state.project = pid; state.sel = null; state.focus = null; lineage = null;
+  renderProjects(); hideInfo(); rebuild(true); updateAgents(); autoLaunch();
+}
+// 프로젝트·상위 폴더를 누르면 그 폴더의 Claude 세션(실행 스크립트가 있으면 그것)과 에이전트 연구실을 함께 연다.
+// 같은 폴더의 터미널이 이미 있으면 새로 만들지 않고 앞으로 가져온다(확장 쪽에서 처리).
+function autoLaunch() {
+  const box = document.getElementById('agAuto');
+  if (!vscodeApi || (box && !box.checked)) return;
+  if (state.project === '*' && !state.root) return;
+  const r = agentRoot(); if (r) vscodeApi.postMessage({ type: 'claude', path: r.path });
+}
+function setRoot(r) {
+  state.root = r; setProject('*');
+}
+function exitFocus() {
+  state.depth = 2; state.focus = null; state.sel = null; lineage = null; hideInfo(); rebuild(true);
+}
+const layoutMode = () => state.focus ? 'layer' : state.project === '*' ? 'force' : state.layout;
+
+// 전체 보기용 프로젝트 노드
+const ROOT_COLOR = ['#00f5ff', '#ff9f1c', '#39ff88', '#b18cff'];
+const ROOTS = [...new Set(G.projects.map(q => q.root))];
+const hubs = G.projects.map(p => {
+  const core = G.links.filter(l => l.project === p.id && TYPE[l.type].flow).length;
+  return { id: 'P:' + p.id, hub: true, project: p.id, label: p.name, rel: p.root + '/' + p.name, path: p.path,
+    group: true, count: p.files, core, kind: 'project', dir: '',
+    color: ROOT_COLOR[ROOTS.indexOf(p.root) % ROOT_COLOR.length] };
+});
+const hubLinks = (() => {
+  const agg = new Map();
+  for (const l of G.links) {
+    if (l.s.project === l.t.project) continue;
+    const key = [l.s.project, l.t.project].sort().join('|');
+    agg.set(key, (agg.get(key) || 0) + 1);
+  }
+  return [...agg.entries()].map(([k, n]) => {
+    const [a, b] = k.split('|');
+    return { source: 'P:' + a, target: 'P:' + b, type: 'copy', weight: n,
+      s: hubs.find(h => h.project === a), t: hubs.find(h => h.project === b) };
+  });
+})();
+const rootHubs = ROOTS.map(r => {
+  const ps = hubs.filter(h => G.projects.find(p => p.id === h.project).root === r);
+  return { id: 'R:' + r, isRoot: true, root: r, label: r, rel: r, project: '', dir: '', kind: 'project',
+    path: G.projects.find(p => p.root === r).path.replace(/\/[^/]*$/, ''),
+    group: true, count: ps.reduce((a, h) => a + h.count, 0), nproj: ps.length,
+    core: ps.reduce((a, h) => a + h.core, 0), fixed: true,
+    color: ROOT_COLOR[ROOTS.indexOf(r) % ROOT_COLOR.length] };
+});
+hubs.forEach(h => { h.root = G.projects.find(p => p.id === h.project).root; });
+const treeLinks = hubs.map(h => {
+  const r = rootHubs.find(x => x.root === h.root);
+  return { source: r.id, target: h.id, type: 'tree', s: r, t: h, c: r.color };
+});
+// MANAGE 는 다른 상위 폴더들을 위에서 관리한다 → 맨 위에 두고 다른 상위 폴더로 선을 잇는다
+const MANAGER = ROOTS.includes(G.manager) ? G.manager : null;
+const managerHub = rootHubs.find(r => r.root === MANAGER);
+if (managerHub) managerHub.manager = true;
+const manageLinks = managerHub ? rootHubs.filter(r => r !== managerHub).map(r =>
+  ({ source: managerHub.id, target: r.id, type: 'tree', s: managerHub, t: r, c: managerHub.color })) : [];
+const colorOf = n => n.color || (KIND[n.kind] || KIND.data).c;
+
+// 상위 폴더나 프로젝트를 고르면, 그 폴더에서 일하는 Claude 에이전트를 VS Code 안에서 볼 수 있는 버튼을 띄운다
+function agentRoot() {
+  try {
+    if (state.root) return rootHubs.find(r => r.root === state.root) || null;
+    const p = G.projects.find(p => p.id === state.project);
+    if (!p) return null;
+    // 프로젝트 폴더에 자체 에이전트 팀(.claude/agents)이 있으면 그 폴더를 쓴다
+    if (p.agents) return { root: `${p.root}/${p.name}`, path: p.path };
+    return rootHubs.find(r => r.root === p.root) || null;
+  } catch (e) { return null; }
+}
+function updateAgents() {
+  const el = document.getElementById('agents'), r = agentRoot();
+  el.style.display = r && vscodeApi ? 'flex' : 'none';
+  if (r) document.getElementById('agentsLabel').textContent = r.root;
+}
+document.getElementById('agFlow').onclick = () => {
+  const r = agentRoot(); if (r && vscodeApi) vscodeApi.postMessage({ type: 'agents', path: r.path });
+};
+document.getElementById('agTerm').onclick = () => {
+  const r = agentRoot(); if (r && vscodeApi) vscodeApi.postMessage({ type: 'claude', path: r.path });
+};
+
+function rebuild(relayout) {
+  const pid = state.project;
+  if (pid === '*') {
+    // 상위 폴더(작업공간 루트)를 큰 신경세포로, 그 둘레에 프로젝트를 배치
+    const roots = rootHubs.filter(r => !state.root || r.root === state.root);
+    const hs = hubs.filter(h => roots.some(r => r.root === h.root));
+    nodes = [...roots, ...hs];
+    const keep = new Set(nodes.map(n => n.id));
+    links = [...manageLinks, ...treeLinks, ...hubLinks].filter(l => keep.has(l.source) && keep.has(l.target));
+    hs.forEach(h => { h.deg = h.core; h.r = 10 + Math.log2(h.count + 1) * 3.2; });
+    roots.forEach(r => { r.deg = r.core; r.r = 30; });
+    adjOut = new Map(); adjIn = new Map();
+    clusters = [];
+    // MANAGE 와 다른 상위 폴더가 함께 보이면 MANAGE 는 위 가운데, 나머지는 그 아래 한 줄
+    const top = roots.length > 1 && roots.find(r => r.manager);
+    const row = roots.filter(r => r !== top);
+    if (top) { top.r = 38; top.deg = top.core + row.length; }
+    roots.forEach(r => {
+      const ri = row.indexOf(r);
+      const cx = r === top ? 0 : (ri - (row.length - 1) / 2) * 1150, cy = r === top ? -1150 : 0;
+      r.x = r.tx0 = cx; r.y = cy; r.vx = r.vy = 0;
+      r.cl = { id: r.id, cx, cy };
+      const mine = hs.filter(h => h.root === r.root).sort((a, b) => b.count - a.count);
+      mine.forEach((h, i) => {
+        // 아래쪽(이름 자리)은 비우고 왼쪽·위·오른쪽으로 펼친다
+        const a = Math.PI * 0.8 + ((i + 0.5) / mine.length) * Math.PI * 1.4;
+        const R = 320 + (i % 2) * 110;
+        h.cl = { id: h.project, cx: cx + Math.cos(a) * R, cy: cy + Math.sin(a) * R };
+        h.fixed = true;                        // 전체 보기는 정해진 자리에 고정 (겹침 방지)
+        if (h.x === undefined || relayout) { h.x = h.cl.cx; h.y = h.cl.cy; h.vx = h.vy = 0; }
+      });
+    });
+    if (relayout) applyLayout(true);
+    updateStats(); renderCrumb();
+    return;
+  }
+  let ns = G.nodes.filter(n => n.project === pid);
+  if (state.hideCopy) ns = ns.filter(n => !COPY_DIR.test(n.rel));
+  const keep = new Set(ns.map(n => n.id));
+  let ls = G.links.filter(l => state.types[l.type] && keep.has(l.source) && keep.has(l.target));
+  const deg = new Map();
+  ls.forEach(l => { deg.set(l.source, (deg.get(l.source) || 0) + 1); deg.set(l.target, (deg.get(l.target) || 0) + 1); });
+  if (state.focus) {
+    // 초점 파일과 이어진 흐름(상류·하류)과 바로 옆 파일만 남긴다
+    if (!keep.has(state.focus.id)) { ns.push(state.focus); keep.add(state.focus.id); }
+    const inn = new Map(), out = new Map();
+    for (const l of ls) {
+      if (!TYPE[l.type].flow) continue;
+      if (!inn.has(l.target)) inn.set(l.target, []);
+      if (!out.has(l.source)) out.set(l.source, []);
+      inn.get(l.target).push(l.source); out.get(l.source).push(l.target);
+    }
+    const reach = new Set([state.focus.id]);
+    // 기본은 앞뒤 2단계까지만 (state.depth), '더 멀리 보기'로 끝까지
+    let hidden = 0;
+    const walk = (id, m, d) => {
+      for (const x of m.get(id) || []) {
+        if (reach.has(x)) continue;
+        if (d >= state.depth) { hidden++; continue; }
+        reach.add(x); walk(x, m, d + 1);
+      }
+    };
+    walk(state.focus.id, inn, 0); walk(state.focus.id, out, 0);
+    state.hidden = hidden;
+    ls.forEach(l => { if (l.source === state.focus.id) reach.add(l.target); if (l.target === state.focus.id) reach.add(l.source); });
+    ns = ns.filter(n => reach.has(n.id));
+    ls = ls.filter(l => reach.has(l.source) && reach.has(l.target));
+    deg.clear();
+    ls.forEach(l => { deg.set(l.source, (deg.get(l.source) || 0) + 1); deg.set(l.target, (deg.get(l.target) || 0) + 1); });
+  } else if (state.hideIso) ns = ns.filter(n => deg.get(n.id));
+  ns.forEach(n => { n.deg = deg.get(n.id) || 0; n.r = (n.group ? 6 : 4) + Math.sqrt(n.deg) * 2.1; });
+  const fresh = ns.filter(n => n.x === undefined);
+  nodes = ns; links = ls;
+  adjOut = new Map(); adjIn = new Map();
+  for (const l of links) {
+    if (!adjOut.has(l.source)) adjOut.set(l.source, []);
+    if (!adjIn.has(l.target)) adjIn.set(l.target, []);
+    adjOut.get(l.source).push(l); adjIn.get(l.target).push(l);
+  }
+  // 전체 보기: 프로젝트별 중심점을 원형으로 배치
+  const pids = [...new Set(nodes.map(n => n.project))];
+  clusters = pids.map((p, i) => {
+    const a = (i / pids.length) * Math.PI * 2, R = pids.length > 1 ? 120 + 70 * pids.length : 0;
+    const size = nodes.filter(n => n.project === p).length;
+    return { id: p, cx: Math.cos(a) * R * (0.6 + Math.min(1, size / 60) * 0.4), cy: Math.sin(a) * R * 0.7, size };
+  });
+  const cmap = new Map(clusters.map(c => [c.id, c]));
+  nodes.forEach(n => { n.cl = cmap.get(n.project); });
+  fresh.forEach(n => {
+    const c = n.cl, a = Math.random() * Math.PI * 2, d = Math.random() * 60 + 10;
+    n.x = c.cx + Math.cos(a) * d; n.y = c.cy + Math.sin(a) * d; n.vx = 0; n.vy = 0;
+  });
+  if (relayout) applyLayout(true); else alpha = Math.max(alpha, 0.3);
+  updateStats(); renderCrumb();
+}
+
+// 화면 위 길잡이
+function renderCrumb() {
+  const el = document.getElementById('crumb');
+  const p = projById.get(state.project);
+  let html = '<div class="path">', say = '';
+  if (!p && !state.root) {
+    html += '<b>🌐 전체 작업공간</b>';
+    say = '가운데 큰 동그라미가 상위 폴더(' + ROOTS.join(', ') + '), 둘레의 동그라미가 그 안의 프로젝트예요. '
+      + (MANAGER ? `맨 위 ${esc(MANAGER)} 는 나머지 상위 폴더를 관리하는 관제탑이에요. ` : '')
+      + '프로젝트를 클릭하면 안으로 들어갑니다.';
+  } else if (!p) {
+    html += `<a data-go="*">🌐 전체</a> › <b>🗂 ${esc(state.root)}</b>`;
+    say = `${esc(state.root)} 안의 프로젝트만 보고 있어요. 프로젝트를 클릭하면 안으로 들어갑니다.`;
+  } else {
+    html += `<a data-go="*">🌐 전체</a> › <a data-go="root">🗂 ${esc(p.root)}</a> › `;
+    if (state.focus) {
+      html += `<a data-go="proj">📁 ${esc(p.name)}</a> › <b>🔍 ${esc(state.focus.label)}</b> <a data-go="proj">← 프로젝트 전체 보기</a>`;
+      if (state.hidden) html += ` <a data-go="deep">더 멀리 보기 (+${state.hidden})</a>`;
+      else if (state.depth > 2) html += ` <a data-go="near">가까운 것만 보기</a>`;
+      say = '왼쪽은 이 파일이 쓰는 것, 오른쪽은 이 파일로 만들어지는 것이에요. 다른 파일을 클릭하면 그 파일 기준으로 바뀝니다.';
+    } else {
+      html += `<b>📁 ${esc(p.name)}</b>`;
+      say = nodes.length ? '파일을 클릭하면 그 파일과 이어진 흐름만 따로 보여줘요.'
+        : '이 프로젝트에서는 파일끼리 읽고 쓰는 관계를 찾지 못했어요. (세부 설정에서 "문서 언급"을 켜 보세요)';
+    }
+  }
+  el.innerHTML = html + '</div><div class="say">' + say + '</div>';
+  el.querySelectorAll('a').forEach(a => a.onclick = () => {
+    const go = a.dataset.go;
+    if (go === '*') setRoot(null);
+    else if (go === 'root') setRoot(p.root);
+    else if (go === 'deep' || go === 'near') { state.depth = go === 'deep' ? 99 : 2; const f = state.focus; select(f); }
+    else exitFocus();
+  });
+}
+window.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape' || ev.target === q) return;
+  if (state.focus) exitFocus();
+  else if (state.project !== '*') setRoot(projById.get(state.project).root);
+  else if (state.root) setRoot(null);
+});
+
+// ───────────── 레이아웃 ─────────────
+let alpha = 1;
+function applyLayout(fit) {
+  nodes.forEach(n => { n.tx = undefined; });
+  if (layoutMode() === 'layer') computeLayers();
+  alpha = 1;
+  if (fit) { warm(layoutMode() === 'layer' ? 0 : 220); fitView(); }
+}
+
+function computeLayers() {
+  // 방향 있는 관계(읽기·생성·import)로 최장 경로 순위 → 왼쪽(원천)에서 오른쪽(결과)으로
+  const dir = links.filter(l => TYPE[l.type].flow);
+  const out = new Map(), hasDir = new Set();
+  dir.forEach(l => {
+    hasDir.add(l.source); hasDir.add(l.target);
+    if (!out.has(l.source)) out.set(l.source, []);
+    out.get(l.source).push(l.target);
+  });
+  // DFS 로 순환(같은 파일을 읽고 다시 쓰는 캐시 등)을 끊고 위상 순서를 만든다
+  const color = new Map(), topo = [], dag = new Map();
+  const visit = id => {
+    color.set(id, 1);
+    for (const t of out.get(id) || []) {
+      if (color.get(t) === 1) continue;            // 되돌아가는 간선은 무시
+      if (!dag.has(id)) dag.set(id, []);
+      dag.get(id).push(t);
+      if (!color.get(t)) visit(t);
+    }
+    color.set(id, 2); topo.push(id);
+  };
+  nodes.forEach(n => { if (hasDir.has(n.id) && !color.get(n.id)) visit(n.id); });
+  topo.reverse();
+  const rank = new Map(topo.map(id => [id, 0]));
+  for (const id of topo) for (const t of dag.get(id) || []) rank.set(t, Math.max(rank.get(t), rank.get(id) + 1));
+  // 원천 데이터는 첫 사용처 바로 앞 칸으로 당긴다
+  for (const n of nodes) {
+    if (!rank.has(n.id) || (adjIn.get(n.id) || []).some(l => TYPE[l.type].flow)) continue;
+    const outs = (adjOut.get(n.id) || []).filter(l => TYPE[l.type].flow).map(l => rank.get(l.target));
+    if (outs.length) rank.set(n.id, Math.max(0, Math.min(...outs) - 1));
+  }
+  const maxR = Math.max(0, ...rank.values());
+  const cols = new Map();
+  const loose = nodes.filter(n => !rank.has(n.id))
+    .sort((a, b) => (a.kind + a.dir + a.label).localeCompare(b.kind + b.dir + b.label));
+  const perCol = Math.max(12, Math.ceil(Math.sqrt(loose.length * 3)));
+  loose.forEach((n, i) => rank.set(n.id, maxR + 1 + Math.floor(i / perCol)));
+  for (const n of nodes) {
+    const r = rank.get(n.id);
+    n.layer = r;
+    if (!cols.has(r)) cols.set(r, []);
+    cols.get(r).push(n);
+  }
+  const keys = [...cols.keys()].sort((a, b) => a - b);
+  const gapX = 230, gapY = 30;
+  // 순서: 같은 프로젝트·폴더끼리, 이후 이웃 평균 위치(barycenter)로 교차 줄이기
+  keys.forEach(k => cols.get(k).sort((a, b) => (a.project + a.dir + a.label).localeCompare(b.project + b.dir + b.label)));
+  const pos = new Map();
+  const place = () => keys.forEach(k => cols.get(k).forEach((n, i) => pos.set(n.id, i - (cols.get(k).length - 1) / 2)));
+  place();
+  for (let sweep = 0; sweep < 6; sweep++) {
+    for (const k of keys) {
+      const col = cols.get(k);
+      col.forEach(n => {
+        const nb = [...(adjIn.get(n.id) || []).map(l => l.source), ...(adjOut.get(n.id) || []).map(l => l.target)]
+          .filter(id => pos.has(id) && byId.get(id).layer !== k);
+        n._bc = nb.length ? nb.reduce((s, id) => s + pos.get(id), 0) / nb.length : pos.get(n.id);
+      });
+      col.sort((a, b) => a._bc - b._bc);
+    }
+    place();
+  }
+  keys.forEach((k, ci) => {
+    const col = cols.get(k);
+    const gy = colGap(col.length);
+    col.forEach((n, i) => { n.tx = ci * gapX; n.ty = (i - (col.length - 1) / 2) * gy; });
+  });
+  const fr = state.focus && rank.has(state.focus.id) ? rank.get(state.focus.id) : null;
+  layerHeads = keys.map((k, ci) => ({ x: ci * gapX, y: -((cols.get(k).length - 1) / 2) * colGap(cols.get(k).length) - 34,
+    t: k === maxR + 1 ? '그 밖의 관련 파일' : k > maxR ? '' :
+       fr !== null ? (k < fr ? '⬅ 입력' : k === fr ? '● 선택한 파일' : '결과 ➡') :
+       k === 0 ? '① 원천 데이터' : `${'①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳'[k] || k + 1} 단계` }));
+}
+let layerHeads = [];
+function colGap(n) { return Math.max(20, Math.min(30, 1400 / n)); }
+
+function tick() {
+  if (alpha < 0.002 && !dragging) return false;
+  const N = nodes.length;
+  if (layoutMode() === 'layer') {
+    for (const n of nodes) {
+      if (n === dragging) continue;
+      n.x += (n.tx - n.x) * 0.16; n.y += (n.ty - n.y) * 0.16;
+    }
+    alpha *= 0.94;
+    return true;
+  }
+  const rep = (N > 120 ? 2600 : 1100) * alpha;
+  for (let i = 0; i < N; i++) {
+    const a = nodes[i];
+    for (let j = i + 1; j < N; j++) {
+      const b = nodes[j];
+      let dx = b.x - a.x, dy = b.y - a.y, d2 = dx * dx + dy * dy;
+      if (d2 > 160000) continue;
+      if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
+      const same = a.project === b.project ? 1 : 2.2;
+      const f = rep * same / d2, d = Math.sqrt(d2);
+      const minD = a.r + b.r + 6;
+      const push = d < minD ? (minD - d) * 0.5 : 0;
+      const fx = (dx / d) * (f + push), fy = (dy / d) * (f + push);
+      a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+    }
+  }
+  for (const l of links) {
+    const a = l.s, b = l.t;
+    const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const weak = l.type === 'mention' || l.type === 'copy';
+    const want = weak ? 120 : 60;
+    const k = (weak ? 0.006 : 0.06) * alpha;
+    const f = (d - want) * k, fx = dx / d * f, fy = dy / d * f;
+    a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+  }
+  const grav = (state.project === '*' ? 0.012 : 0.006) * alpha;
+  for (const n of nodes) {
+    const gk = state.project === '*' ? 4 : n.deg ? 1 : 2.5;     // 전체 보기는 자리를 단단히 지킨다
+    n.vx += (n.cl.cx - n.x) * grav * gk;
+    n.vy += (n.cl.cy - n.y) * grav * gk;
+    if (n === dragging || n.fixed) { n.vx = n.vy = 0; if (n.fixed && n !== dragging) { n.x = n.cl.cx; n.y = n.cl.cy; } continue; }
+    n.vx *= 0.55; n.vy *= 0.55;
+    n.x += n.vx; n.y += n.vy;
+  }
+  alpha *= 0.985;
+  return true;
+}
+function warm(steps) { for (let i = 0; i < steps; i++) tick(); }
+
+// ───────────── 그리기 ─────────────
+function resize() {
+  DPR = window.devicePixelRatio || 1;
+  const r = cv.getBoundingClientRect(); W = r.width; H = r.height;
+  cv.width = W * DPR; cv.height = H * DPR;
+}
+function fitView() {
+  if (!nodes.length) return;
+  const xs = nodes.map(n => n.tx ?? n.x), ys = nodes.map(n => n.ty ?? n.y);
+  const ov = state.project === '*';   // 전체 보기는 이름이 노드 아래 가운데라 양옆·아래 여백을 더 둔다
+  const x0 = Math.min(...xs) - (ov ? 180 : 60), x1 = Math.max(...xs) + (ov ? 180 : 240),
+        y0 = Math.min(...ys) - 60, y1 = Math.max(...ys) + (ov ? 110 : 60);
+  const padR = state.focus && W > 900 ? 350 : 0, padT = 70;   // 오른쪽 상세 패널·위쪽 길잡이 자리 비우기
+  const w = W - padR, h = H - padT;
+  view.k = Math.min(2.2, Math.max(0.15, Math.min(w / (x1 - x0), h / (y1 - y0))));
+  view.x = w / 2 - (x0 + x1) / 2 * view.k; view.y = padT + h / 2 - (y0 + y1) / 2 * view.k;
+}
+
+let lineage = null; // {up:Set, down:Set, direct:Set}
+function computeLineage(n) {
+  const up = new Set(), down = new Set(), direct = new Set([n.id]);
+  const walk = (id, map, key, set) => {
+    for (const l of map.get(id) || []) {
+      if (!TYPE[l.type].flow) continue;
+      const nx = l[key];
+      if (!set.has(nx)) { set.add(nx); walk(nx, map, key, set); }
+    }
+  };
+  walk(n.id, adjIn, 'source', up); walk(n.id, adjOut, 'target', down);
+  for (const l of adjIn.get(n.id) || []) direct.add(l.source);
+  for (const l of adjOut.get(n.id) || []) direct.add(l.target);
+  return { up, down, direct };
+}
+function isLit(id) {
+  if (!lineage) return true;
+  return lineage.up.has(id) || lineage.down.has(id) || lineage.direct.has(id);
+}
+function linkLit(l) {
+  if (!lineage) return true;
+  const s = state.sel.id;
+  if (l.source === s || l.target === s) return true;
+  if (!TYPE[l.type].flow) return false;
+  return (lineage.up.has(l.source) || l.source === s) && (lineage.up.has(l.target) || l.target === s)
+      || (lineage.down.has(l.source) || l.source === s) && (lineage.down.has(l.target) || l.target === s);
+}
+
+function curve(a, b) {
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
+  const bend = layoutMode() === 'layer' ? 0 : 0.12;
+  return [mx - dy * bend, my + dx * bend];
+}
+function qpt(a, c, b, t) {
+  const u = 1 - t;
+  return [u * u * a.x + 2 * u * t * c[0] + t * t * b.x, u * u * a.y + 2 * u * t * c[1] + t * t * b.y];
+}
+
+const matches = () => state.query && state.project !== '*' ? nodes.filter(n => n.label.toLowerCase().includes(state.query) || n.rel.toLowerCase().includes(state.query)) : [];
+let matchSet = new Set();
+
+function draw(time) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#0b0b16'; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(view.x, view.y); ctx.scale(view.k, view.k);
+  const hov = state.hover;
+
+  // 레이어 머리글
+  if (layoutMode() === 'layer') {
+    ctx.font = `600 ${Math.max(13, 14 / view.k)}px Segoe UI, Malgun Gothic`; ctx.fillStyle = '#8a8aa6'; ctx.textAlign = 'center';
+    for (const h of layerHeads) ctx.fillText(h.t, h.x, h.y);
+    ctx.textAlign = 'left';
+  }
+  // 관계선
+  ctx.lineCap = 'round';
+  for (const l of links) {
+    const T = TYPE[l.type], lit = linkLit(l);
+    const hot = hov && (l.source === hov.id || l.target === hov.id);
+    const a = l.s, b = l.t, c = curve(a, b);
+    ctx.globalAlpha = lit ? (hot ? 0.95 : lineage ? 0.85 : T.flow ? 0.42 : 0.22) : 0.04;
+    ctx.strokeStyle = l.c || T.c;
+    ctx.lineWidth = (hot || (lineage && lit) ? 1.8 : 1) * (T.flow ? 1.1 : 0.8) / Math.sqrt(view.k);
+    ctx.setLineDash(T.dash ? T.dash.map(v => v / view.k) : []);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(c[0], c[1], b.x, b.y); ctx.stroke();
+    // 화살촉
+    if (T.flow && lit && (view.k > 0.5 || lineage || hot)) {
+      const [px, py] = qpt(a, c, b, 1 - (b.r + 2) / (Math.hypot(b.x - a.x, b.y - a.y) || 1));
+      const [qx, qy] = qpt(a, c, b, 0.9);
+      const ang = Math.atan2(py - qy, px - qx), s = 5 / Math.sqrt(view.k);
+      ctx.setLineDash([]); ctx.fillStyle = T.c;
+      ctx.beginPath(); ctx.moveTo(px, py);
+      ctx.lineTo(px - Math.cos(ang - 0.45) * s, py - Math.sin(ang - 0.45) * s);
+      ctx.lineTo(px - Math.cos(ang + 0.45) * s, py - Math.sin(ang + 0.45) * s); ctx.fill();
+    }
+  }
+  ctx.setLineDash([]);
+  // 신호 펄스 (데이터가 흐르는 방향)
+  if (state.pulse) {
+    ctx.globalCompositeOperation = 'lighter';
+    for (const l of links) {
+      const T = TYPE[l.type];
+      if (!(T.flow || T.pulse) || !linkLit(l)) continue;
+      if (lineage === null && links.length > 500 && !(hov && (l.source === hov.id || l.target === hov.id))) continue;
+      const len = Math.hypot(l.t.x - l.s.x, l.t.y - l.s.y);
+      const ph = ((time / 1000) * (60 / Math.max(len, 40)) + (l._ph ??= Math.random())) % 1;
+      const c = curve(l.s, l.t), [x, y] = qpt(l.s, c, l.t, ph);
+      ctx.globalAlpha = lineage ? 0.95 : 0.7;
+      const r = 2.2 / Math.sqrt(view.k);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+      const lc = l.c || T.c;
+      g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, lc); g.addColorStop(1, lc + '00');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, 7); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // 노드
+  for (const n of nodes) {
+    const K = { c: colorOf(n) }, lit = isLit(n.id) && !(n.hub && !n.core);
+    const isSel = state.sel === n, isHov = hov === n, isMatch = matchSet.has(n.id);
+    ctx.globalAlpha = lit ? 1 : 0.12;
+    // 빛번짐
+    if (lit && (n.deg || isSel)) {
+      const gr = n.r * (isSel || isHov ? 4 : 2.6);
+      const g = ctx.createRadialGradient(n.x, n.y, n.r * 0.4, n.x, n.y, gr);
+      g.addColorStop(0, K.c + (isSel ? '88' : '44')); g.addColorStop(1, K.c + '00');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(n.x, n.y, gr, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = n.deg ? K.c : '#0b0b16';
+    ctx.strokeStyle = K.c; ctx.lineWidth = 1.4 / Math.sqrt(view.k);
+    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill(); ctx.stroke();
+    if (n.deg) { ctx.fillStyle = '#ffffffcc'; ctx.beginPath(); ctx.arc(n.x, n.y, n.r * 0.35, 0, 7); ctx.fill(); }
+    if (n.group) {
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 3.5 / Math.sqrt(view.k), 0, 7); ctx.stroke();
+    }
+    if (isSel || isMatch) {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / view.k;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 7 / view.k, 0, 7); ctx.stroke();
+    }
+  }
+  // 이름 (중요한 것부터, 이미 그린 이름과 겹치면 생략)
+  if (state.project === '*') {
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (const n of nodes) {
+      ctx.globalAlpha = n.core || n.manager ? 1 : 0.5;
+      if (n.isRoot) {
+        ctx.textBaseline = 'middle';
+        ctx.font = `700 ${Math.max(18, 22 / view.k)}px Segoe UI, Malgun Gothic`;
+        ctx.fillStyle = '#ffffff'; ctx.lineWidth = 5 / view.k; ctx.strokeStyle = '#0b0b16';
+        const ty = n.y + n.r + Math.max(22, 26 / view.k);
+        ctx.strokeText('🗂 ' + n.label, n.x, ty);
+        ctx.fillText('🗂 ' + n.label, n.x, ty);
+        ctx.font = `${Math.max(12, 13 / view.k)}px Segoe UI, Malgun Gothic`; ctx.fillStyle = n.color;
+        const sub = (n.manager && nodes.some(m => m.isRoot && m !== n) ? '관리 · ' : '') + `프로젝트 ${n.nproj} · 파일 ${n.count}`;
+        ctx.strokeText(sub, n.x, ty + Math.max(24, 28 / view.k));
+        ctx.fillText(sub, n.x, ty + Math.max(24, 28 / view.k));
+        ctx.textBaseline = 'top';
+        continue;
+      }
+      ctx.font = `600 ${Math.max(13, 15 / view.k)}px Segoe UI, Malgun Gothic`;
+      ctx.fillStyle = '#ffffff'; ctx.lineWidth = 4 / view.k; ctx.strokeStyle = '#0b0b16';
+      ctx.strokeText(n.label, n.x, n.y + n.r + 6); ctx.fillText(n.label, n.x, n.y + n.r + 6);
+      ctx.font = `${Math.max(11, 12 / view.k)}px Segoe UI, Malgun Gothic`; ctx.fillStyle = '#9a9ab8';
+      const sub = `파일 ${n.count} · 흐름 ${n.core}`, dy = n.y + n.r + 6 + Math.max(17, 19 / view.k);
+      ctx.strokeText(sub, n.x, dy); ctx.fillText(sub, n.x, dy);
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.restore(); ctx.globalAlpha = 1;
+    return;
+  }
+  const fs = Math.max(12, 13 / view.k);
+  ctx.font = `${fs}px Segoe UI, Malgun Gothic`; ctx.textBaseline = 'middle';
+  const pri = n => (n === state.sel || n === hov ? 1e6 : 0) + (matchSet.has(n.id) ? 1e5 : 0) +
+    (lineage && lineage.direct.has(n.id) ? 1e4 : 0) + (lineage && isLit(n.id) ? 1e3 : 0) + n.deg;
+  const order = nodes.slice().sort((a, b) => pri(b) - pri(a));
+  const boxes = [];
+  for (const n of order) {
+    const lit = isLit(n.id);
+    const must = n === hov || n === state.sel || matchSet.has(n.id) || (lineage && lineage.direct.has(n.id));
+    if (!must && !(state.labels && lit)) continue;
+    const txt = n.group ? `${n.label} (${n.count})` : n.label;
+    const w = ctx.measureText(txt).width, x = n.x + n.r + 4, y = n.y;
+    const box = [x - 2, y - fs * 0.6, x + w + 2, y + fs * 0.6];
+    if (!must && boxes.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+    boxes.push(box);
+    ctx.globalAlpha = lit ? (n.deg || n === hov ? 0.95 : 0.55) : 0.2;
+    ctx.fillStyle = n === state.sel || n === hov ? '#ffffff' : '#d8d8ea';
+    ctx.lineWidth = 3 / view.k; ctx.strokeStyle = '#0b0b16';
+    ctx.strokeText(txt, x, y); ctx.fillText(txt, x, y);
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
+function loop(t) {
+  tick();
+  draw(t);
+  requestAnimationFrame(loop);
+}
+
+// ───────────── 상호작용 ─────────────
+const tip = document.getElementById('tip');
+function toWorld(ev) {
+  const r = cv.getBoundingClientRect();
+  return [(ev.clientX - r.left - view.x) / view.k, (ev.clientY - r.top - view.y) / view.k];
+}
+function pick(ev) {
+  const [x, y] = toWorld(ev);
+  let best = null, bd = Infinity;
+  for (const n of nodes) {
+    const d = Math.hypot(n.x - x, n.y - y);
+    if (d < n.r + 6 / view.k && d < bd) { best = n; bd = d; }
+  }
+  return best;
+}
+let dragging = null, panning = null, moved = false;
+cv.addEventListener('mousedown', ev => {
+  moved = false;
+  const n = pick(ev);
+  if (n) { dragging = n; alpha = Math.max(alpha, 0.15); }
+  else panning = { x: ev.clientX - view.x, y: ev.clientY - view.y };
+  cv.classList.add('drag');
+});
+window.addEventListener('mousemove', ev => {
+  if (dragging) {
+    const [x, y] = toWorld(ev); dragging.x = x; dragging.y = y;
+    if (layoutMode() === 'layer') { dragging.tx = x; dragging.ty = y; }
+    moved = true; alpha = Math.max(alpha, 0.12); return;
+  }
+  if (panning) { view.x = ev.clientX - panning.x; view.y = ev.clientY - panning.y; moved = true; return; }
+  if (ev.target !== cv) return;
+  const n = pick(ev);
+  state.hover = n;
+  cv.style.cursor = n ? 'pointer' : 'grab';
+  if (n) {
+    const r = cv.parentElement.getBoundingClientRect();
+    tip.style.display = 'block';
+    tip.style.left = Math.min(ev.clientX - r.left + 14, r.width - 300) + 'px';
+    tip.style.top = (ev.clientY - r.top + 14) + 'px';
+    tip.innerHTML = n.isRoot
+      ? `<div>🗂 ${esc(n.label)}</div><div class="p">프로젝트 ${n.nproj}개 · 파일 ${n.count}개 · 클릭하면 이 폴더만 보기</div>`
+      : n.hub
+      ? `<div>📁 ${esc(n.label)}</div><div class="p">파일 ${n.count}개 · 읽기/생성/import 관계 ${n.core}개 · 클릭해서 들어가기</div>`
+      : `<div>${esc(n.group ? `${n.label} · ${n.count}개` : n.label)}</div><div class="p">${esc(n.project.split('/')[1])} / ${esc(n.rel)}</div>`;
+  } else tip.style.display = 'none';
+});
+window.addEventListener('mouseup', ev => {
+  if (!moved && ev.target === cv) {
+    const n = pick(ev);
+    if (n) select(n);
+    else if (!state.focus) { state.sel = null; lineage = null; hideInfo(); }
+  }
+  dragging = null; panning = null; cv.classList.remove('drag');
+});
+cv.addEventListener('dblclick', ev => { const n = pick(ev); if (n) openPath(n, n.hub || n.isRoot); });
+cv.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const r = cv.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  const k2 = Math.min(5, Math.max(0.08, view.k * Math.exp(-ev.deltaY * 0.0015)));
+  view.x = mx - (mx - view.x) * k2 / view.k; view.y = my - (my - view.y) * k2 / view.k; view.k = k2;
+}, { passive: false });
+document.getElementById('fit').onclick = fitView;
+window.addEventListener('resize', () => { resize(); });
+
+const q = document.getElementById('q');
+q.addEventListener('input', () => {
+  state.query = q.value.trim().toLowerCase();
+  matchSet = new Set(matches().map(n => n.id));
+});
+q.addEventListener('keydown', ev => {
+  if (ev.key !== 'Enter') return;
+  let m = matches();
+  if (!m.length && state.query) {   // 다른 프로젝트에 있으면 그 프로젝트로 이동
+    const hit = G.nodes.find(n => n.label.toLowerCase().includes(state.query));
+    if (hit) m = [hit];
+  }
+  if (m.length) select(m[0]);
+});
+function centerOn(n) { view.x = W / 2 - n.x * view.k; view.y = H / 2 - n.y * view.k; }
+
+function select(n) {
+  if (n.isRoot) { setRoot(state.root === n.root ? null : n.root); return; }
+  if (n.hub) { setProject(n.project); return; }
+  if (n.project !== state.project) { state.project = n.project; renderProjects(); }
+  if (n !== state.focus) state.depth = 2;
+  state.focus = n; rebuild(true);
+  state.sel = n; lineage = computeLineage(n); showInfo(n);
+}
+
+// ───────────── 상세 패널 ─────────────
+const info = document.getElementById('info');
+function hideInfo() { info.style.display = 'none'; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+function fmtSize(b) { return b > 1e6 ? (b / 1e6).toFixed(1) + ' MB' : b > 1e3 ? (b / 1e3).toFixed(0) + ' KB' : b + ' B'; }
+function showInfo(n) {
+  const K = KIND[n.kind] || KIND.data;
+  const ins = (adjIn.get(n.id) || []), outs = (adjOut.get(n.id) || []);
+  const sec = (title, arr, key) => {
+    if (!arr.length) return '';
+    return `<div class="grp"><b>${title} · ${arr.length}</b>` + arr.map(l => {
+      const o = l[key];
+      return `<div class="it" data-id="${esc(o.id)}"><span class="dot" style="color:${(KIND[o.kind] || KIND.data).c};width:8px;height:8px"></span><span title="${esc(o.rel)}">${esc(o.group ? o.label + ' (' + o.count + ')' : o.label)}</span></div>`;
+    }).join('') + '</div>';
+  };
+  const f = (arr, t) => arr.filter(l => l.type === t);
+  const up = lineage.up.size, down = lineage.down.size;
+  info.innerHTML = `<button id="close">✕</button>
+    <h2><span class="dot" style="color:${K.c};width:9px;height:9px"></span> ${esc(n.group ? n.label + ' · ' + n.count + '개' : n.label)}</h2>
+    <div class="p">${esc(n.project)} / ${esc(n.rel)}</div>
+    <div class="p">${K.t}${n.size ? ' · ' + fmtSize(n.size) : ''} · 상류 ${up} · 하류 ${down}</div>
+    <div class="btns">
+      ${n.group ? '' : '<button id="op">VS Code에서 열기</button>'}
+      <button id="rv">탐색기에서 보기</button>
+    </div>
+    ${sec('⬅ 읽어오는 데이터', f(ins, 'read'), 's')}
+    ${sec('⬅ import 하는 모듈', f(ins, 'import'), 's')}
+    ${sec('➡ 만들어내는 결과물', f(outs, 'write'), 't')}
+    ${sec('➡ 이 파일을 읽는 곳', f(outs, 'read'), 't')}
+    ${sec('➡ 이 모듈을 import 하는 곳', f(outs, 'import'), 't')}
+    ${sec('⬅ 이 파일을 만드는 곳', f(ins, 'write'), 's')}
+    ${sec('경로만 참조', [...f(ins, 'use')], 's')}
+    ${sec('경로만 참조하는 곳', [...f(outs, 'use')], 't')}
+    ${sec('📝 이 문서가 언급하는 파일', f(outs, 'mention'), 't')}
+    ${sec('📝 이 파일을 언급하는 문서', f(ins, 'mention'), 's')}
+    ${sec('⧉ 같은 내용 사본', [...f(outs, 'copy'), ...f(ins, 'copy').map(l => ({ ...l, t: l.s }))], 't')}
+  `;
+  info.style.display = 'block';
+  info.querySelector('#close').onclick = () => hideInfo();
+  const op = info.querySelector('#op'); if (op) op.onclick = () => openPath(n);
+  info.querySelector('#rv').onclick = () => openPath(n, true);
+  info.querySelectorAll('.it').forEach(el => el.onclick = () => {
+    const o = byId.get(el.dataset.id);
+    if (o) select(o);
+  });
+}
+function updateStats() {
+  const t = {};
+  links.forEach(l => t[l.type] = (t[l.type] || 0) + 1);
+  document.getElementById('stats').textContent = state.project === '*' ? `프로젝트 ${nodes.filter(n => n.hub).length}개` :
+    `파일 ${nodes.length} · ` + Object.entries(t).map(([k, v]) => `${TYPE[k].t.split(' ')[0]} ${v}`).join(' · ');
+}
+
+resize();
+renderProjects();
+rebuild(true);
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
